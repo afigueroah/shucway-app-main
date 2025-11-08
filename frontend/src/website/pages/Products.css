@@ -1,0 +1,475 @@
+.products {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.product-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4rem;
+  min-height: 50vh;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.5s ease;
+}
+
+.product-hero[data-slide="0"] {
+  background: linear-gradient(45deg, #FFD40D, #22c55e);
+}
+
+.product-hero[data-slide="1"] {
+  background: linear-gradient(45deg, #346C60, #0AA06E);
+}
+
+.product-hero[data-slide="2"] {
+  background: linear-gradient(45deg, #00A149, #FFD40D);
+}
+
+.product-content {
+  flex: 1;
+  padding: 3rem;
+  max-width: 700px;
+  z-index: 2;
+}
+
+.product-content h1 {
+  font-size: 5rem;
+  font-weight: 900;
+  margin-bottom: 2rem;
+  line-height: 1.1;
+  color: white;
+  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.product-content h1 span {
+  color: #FFD40D;
+  display: block;
+  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.product-content p {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  color: white;
+  opacity: 0.9;
+  line-height: 1.5;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.product-image {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
+}
+
+.product-image img {
+  width: 600px;
+  height: 600px;
+  object-fit: contain;
+  animation: gentleFloat 4s ease-in-out infinite;
+  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.2));
+}
+
+@keyframes gentleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Menu Section */
+.products-menu-section {
+  padding: 6rem 2rem;
+  background: #fff;
+}
+
+.products-menu-title {
+  text-align: center;
+  font-size: 3rem;
+  color: #346C60;
+  margin-bottom: 4rem;
+  font-weight: 800;
+}
+
+.products-menu-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.products-menu-item {
+  background: white;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.products-menu-item:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.products-menu-item img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.products-menu-item-title {
+  padding: 1.5rem 1.5rem 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #346C60;
+}
+
+.products-menu-item-desc {
+  padding: 0 1.5rem 1.5rem;
+  color: #666;
+}
+
+/* Chef Section */
+.products-chef-section {
+  padding: 4rem 2rem;
+  background: #346C60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rem;
+}
+
+.products-chef-img {
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 5px solid #FFD40D;
+}
+
+.products-chef-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.products-chef-msg {
+  max-width: 500px;
+  color: white;
+}
+
+.products-chef-title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: #FFD40D;
+}
+
+.products-chef-msg blockquote {
+  font-size: 1.8rem;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+/* Productos Destacados */
+.products-destacados-section {
+  padding: 6rem 2rem;
+  background: #f8fafc;
+}
+
+.products-destacados-section h2 {
+  text-align: center;
+  font-size: 3rem;
+  color: #346C60;
+  margin-bottom: 2rem;
+}
+
+.products-counter {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #22c55e;
+  margin-bottom: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.products-destacados-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.products-destacado-card {
+  background: white;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.products-destacado-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.products-destacado-card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.products-destacado-info {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.products-destacado-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #346C60;
+  margin-bottom: 0.5rem;
+}
+
+.products-destacado-price {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #22c55e;
+}
+
+/* Ingredientes Section */
+.products-ingredientes-section {
+  padding: 6rem 2rem;
+  background: white;
+}
+
+.products-ingredientes-section h2 {
+  text-align: center;
+  font-size: 3rem;
+  color: #346C60;
+  margin-bottom: 4rem;
+  font-weight: 800;
+}
+
+.products-ingredientes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.products-ingrediente-card {
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.products-ingrediente-card:hover {
+  transform: translateY(-5px);
+}
+
+.products-ingrediente-card img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.products-ingrediente-title {
+  font-size: 1.1rem;
+  color: #346C60;
+  font-weight: 600;
+}
+
+/* Galería Section */
+.products-galeria-section {
+  padding: 6rem 2rem;
+  background: #f8fafc;
+}
+
+.products-galeria-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.products-galeria-img {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  border-radius: 1rem;
+  transition: transform 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.products-galeria-img:hover {
+  transform: scale(1.05);
+}
+
+.product-card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.product-header {
+  padding: 2rem 2rem 1rem;
+  text-align: center;
+}
+
+.product-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.product-header h3 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #1a202c;
+}
+
+.product-description {
+  padding: 0 2rem;
+  color: #4a5568;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.product-features {
+  padding: 0 2rem;
+  list-style: none;
+  margin: 0 0 2rem 0;
+}
+
+.product-features li {
+  padding: 0.25rem 0;
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.product-footer {
+  padding: 1.5rem 2rem 2rem;
+  background: #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.product-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+/* Pricing Info */
+.pricing-info {
+  background: white;
+  padding: 3rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.pricing-info h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #1a202c;
+}
+
+.pricing-info p {
+  color: #4a5568;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .product-hero {
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem 1rem;
+    min-height: 70vh;
+  }
+
+  .product-content {
+    padding: 2rem 1rem;
+  }
+
+  .product-content h1 {
+    font-size: 3rem;
+  }
+
+  .product-image img {
+    width: 300px;
+    height: 300px;
+  }
+
+  .products-chef-section {
+    flex-direction: column;
+    text-align: center;
+    gap: 2rem;
+    padding: 3rem 1rem;
+  }
+
+  .products-chef-img {
+    width: 200px;
+    height: 200px;
+  }
+
+  .products-chef-msg blockquote {
+    font-size: 1.5rem;
+  }
+
+  .products-menu-section,
+  .products-destacados-section,
+  .products-ingredientes-section,
+  .products-galeria-section {
+    padding: 4rem 1rem;
+  }
+
+  .products-menu-title,
+  .products-destacados-section h2,
+  .products-ingredientes-section h2 {
+    font-size: 2rem;
+  }
+
+  .products-galeria-grid {
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+
+  .products-galeria-img {
+    height: 250px;
+  }
+
+  .products-ingredientes-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+}

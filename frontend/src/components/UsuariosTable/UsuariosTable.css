@@ -1,0 +1,30 @@
+.users-table .ant-table-thead > tr > th {
+  background-color: var(--header-bg) !important;
+  color: var(--header-text) !important;
+  font-weight: 600;
+}
+
+.users-table .ant-table-tbody > tr:hover > td {
+  background-color: #f0faf8 !important;
+}
+
+.users-table .ant-table-tbody > tr > td {
+  transition: all 0.3s ease;
+}
+
+.users-table .ant-table-row-selected > td {
+  background-color: #d1e9e4 !important;
+}
+
+.users-table .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #13443c;
+  border-color: #13443c;
+}
+
+.users-table .ant-pagination-item-active {
+  border-color: #13443c;
+}
+
+.users-table .ant-pagination-item-active a {
+  color: #13443c;
+}

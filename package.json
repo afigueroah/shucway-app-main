@@ -1,0 +1,26 @@
+{
+  "name": "shucway-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:backend:fast": "npm --prefix backend run dev:fast",
+    "dev:backend:watch": "npm --prefix backend run dev:watch",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:backend\" --names \"FRONTEND,BACKEND\" --prefix-colors \"cyan,yellow\"",
+    "dev:all:fast": "concurrently \"npm run dev\" \"npm run dev:backend:fast\" --names \"FRONTEND,BACKEND\" --prefix-colors \"cyan,yellow\"",
+    "dev:all:watch": "concurrently \"npm run dev\" \"npm run dev:backend:watch\" --names \"FRONTEND,BACKEND\" --prefix-colors \"cyan,yellow\"",
+    "build": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:all": "npm run build:backend && npm run build",
+    "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
+    "preview": "npm --prefix frontend run preview"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "lucide-react": "^0.552.0"
+  }
+}

@@ -1,0 +1,91 @@
+/* Estilos para Auditoría */
+
+.auditoria-header{
+  display:flex;
+  flex-direction:column;
+  gap:1rem;
+}
+
+.auditoria-top{
+  display:flex;
+  gap:0.75rem;
+  align-items:stretch;
+  justify-content:space-between;
+}
+
+.auditoria-cards{ display:flex; gap:0.75rem; align-items:stretch; flex:1 }
+.audit-card{ background: #fff; padding: 1rem 1.25rem; border-radius:0.75rem; box-shadow: 0 8px 24px rgba(16,24,40,0.04); min-width:220px; display:flex; align-items:center; justify-content:space-between }
+.audit-card .small{ font-size:0.75rem; color:#6b7280 }
+.audit-card .big{ font-weight:800; margin-top:6px; color: #065f46 }
+.audit-card .audit-icon{ background: rgba(0,0,0,0.04); padding:8px; border-radius:999px; display:flex; align-items:center; justify-content:center; min-width:36px; min-height:36px }
+.audit-success{ border:1px solid rgba(16,185,129,0.12) }
+.audit-success .audit-icon{ background: rgba(16,185,129,0.12); color:#059669 }
+.audit-count{ border:1px solid rgba(234,179,8,0.12) }
+.audit-count .audit-icon{ background: rgba(234,179,8,0.12); color:#b45309 }
+.audit-danger{ border:1px solid rgba(244,114,114,0.08); }
+.audit-danger .audit-icon{ background: rgba(244,114,114,0.08); color:#d63a3a }
+.audit-user{ border:1px solid rgba(156,163,175,0.06) }
+.audit-user .audit-icon{ background: rgba(156,163,175,0.06); color:#374151 }
+
+.auditoria-actions{ display:flex; gap:0.75rem; align-items:center; margin-top:0 }
+.auditoria-actions .btn{ padding:0.65rem 1.25rem; border-radius:10px; font-weight:600 }
+.btn{ padding:0.6rem 1rem; border-radius:8px; background:#f3f4f6; color:#111827; border:none; cursor:pointer }
+.btn.primary{ background:#064E3B; color:#fff }
+.btn.secondary{ background:#C2E66E; color:#123; }
+.btn.outline{ background:#3f3d46; color:#fff }
+.btn.danger{ background:#dc2626; color:#fff }
+
+.auditoria-actions-wrapper{ display:flex; align-items:flex-start }
+.auditoria-actions{ display:flex; flex-direction:column; gap:0.75rem; align-items:stretch }
+.auditoria-actions .btn{ width:220px }
+
+/* Animaciones de hover para botones */
+.auditoria-actions .btn{
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+.auditoria-actions .btn:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(16,24,40,0.08);
+  opacity: 0.98;
+}
+.auditoria-actions .btn:active{
+  transform: translateY(0px) scale(0.995);
+}
+
+.auditoria-search input{ border:1px solid #e5e7eb }
+
+.badge{ padding:0.25rem 0.5rem; border-radius:8px; font-size:0.8rem }
+.badge-success{ background:#d1fae5; color:#065f46 }
+.badge-pending{ background:#fff7ed; color:#92400e }
+
+/* Tabla: entradas y diferencias */
+.inv-table input[type="number"]{ background: #ffffff; border:1px solid #e5e7eb; padding:6px; border-radius:6px }
+.inv-table input.counted{ background: #ecfdf5 } /* verde claro cuando hay conteo aplicable */
+.diff-cell { padding:6px 8px; border-radius:6px; display:inline-block; min-width:48px; text-align:center }
+.diff-positive { background:#ecfdf5; color:#065f46 } /* + */
+.diff-negative { background:#fff1f2; color:#d63a3a } /* - */
+.diff-zero { background:#f3f4f6; color:#6b7280 } /* 0 */
+
+/* Estilos para inputs del modal de auditoría */
+.auditoria-modal-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.auditoria-modal-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.auditoria-modal-input::placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}

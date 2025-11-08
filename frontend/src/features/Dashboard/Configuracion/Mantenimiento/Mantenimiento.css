@@ -1,0 +1,293 @@
+/* Mantenimiento Styles */
+.mantenimiento-container {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  min-height: 100vh;
+}
+
+.mantenimiento-header {
+  background: linear-gradient(135deg, #346C60 0%, #12443D 100%);
+  color: white;
+  padding: 2rem;
+  border-radius: 16px;
+  margin-bottom: 2rem;
+  box-shadow: 0 10px 30px rgba(52, 108, 96, 0.2);
+}
+
+.mantenimiento-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(52, 108, 96, 0.1);
+  overflow: hidden;
+}
+
+.mantenimiento-tabs .ant-tabs-tab {
+  border-radius: 8px 8px 0 0 !important;
+  margin-right: 4px !important;
+}
+
+.mantenimiento-tabs .ant-tabs-tab-active {
+  background: linear-gradient(135deg, #346C60 0%, #FFD40D 100%) !important;
+  color: white !important;
+}
+
+.mantenimiento-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: white !important;
+}
+
+.custom-table .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #346C60 0%, #12443D 100%) !important;
+  color: white !important;
+  font-weight: 600;
+  border-bottom: 2px solid #FFD40D;
+}
+
+.custom-table .ant-table-tbody > tr:hover > td {
+  background: rgba(52, 108, 96, 0.05) !important;
+}
+
+.custom-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(52, 108, 96, 0.1);
+}
+
+.stats-card {
+  background: linear-gradient(135deg, #346C60 0%, #12443D 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(52, 108, 96, 0.2);
+}
+
+.stats-card .stat-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #FFD40D;
+  margin-bottom: 0.5rem;
+}
+
+.stats-card .stat-label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 16px;
+  border: 2px dashed rgba(52, 108, 96, 0.2);
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  color: #FFD40D;
+  margin-bottom: 1rem;
+}
+
+.empty-state-title {
+  color: #12443D;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-description {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #346C60 0%, #12443D 100%) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+}
+
+.primary-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(52, 108, 96, 0.3) !important;
+}
+
+.accent-btn {
+  background: linear-gradient(135deg, #FFD40D 0%, #ffb700 100%) !important;
+  border: none !important;
+  color: #12443D !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+}
+
+.accent-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(255, 212, 13, 0.3) !important;
+}
+
+.filter-section {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(52, 108, 96, 0.1);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.action-btn-view {
+  color: #346C60 !important;
+  transition: all 0.2s ease;
+}
+
+.action-btn-view:hover {
+  background: rgba(52, 108, 96, 0.1) !important;
+  transform: scale(1.1);
+}
+
+.action-btn-edit {
+  color: #FFD40D !important;
+  transition: all 0.2s ease;
+}
+
+.action-btn-edit:hover {
+  background: rgba(255, 212, 13, 0.1) !important;
+  transform: scale(1.1);
+}
+
+.action-btn-delete {
+  color: #ff4d4f !important;
+  transition: all 0.2s ease;
+}
+
+.action-btn-delete:hover {
+  background: rgba(255, 77, 79, 0.1) !important;
+  transform: scale(1.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .mantenimiento-header {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .mantenimiento-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .stats-card {
+    padding: 1rem;
+  }
+
+  .stats-card .stat-number {
+    font-size: 2rem;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+/* Loading Animation */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.loading-spinner {
+  color: #346C60;
+  margin-bottom: 1rem;
+}
+
+.loading-text {
+  color: #666;
+  font-size: 1rem;
+}
+
+/* Modal Styles */
+.custom-modal .ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.custom-modal .ant-modal-header {
+  background: linear-gradient(135deg, #346C60 0%, #12443D 100%);
+  color: white;
+  border-radius: 16px 16px 0 0;
+}
+
+.custom-modal .ant-modal-title {
+  color: white !important;
+  font-weight: 600;
+}
+
+.custom-modal .ant-modal-close-x {
+  color: white;
+}
+
+/* Form Styles */
+.custom-form .ant-form-item-label > label {
+  color: #12443D;
+  font-weight: 600;
+}
+
+.custom-form .ant-input,
+.custom-form .ant-select-selector,
+.custom-form .ant-input-number {
+  border-radius: 8px;
+  border: 2px solid rgba(52, 108, 96, 0.2);
+  transition: all 0.3s ease;
+}
+
+.custom-form .ant-input:focus,
+.custom-form .ant-select-selector:focus,
+.custom-form .ant-input-number:focus {
+  border-color: #346C60;
+  box-shadow: 0 0 0 2px rgba(52, 108, 96, 0.1);
+}
+
+/* Badge Styles */
+.status-badge-active {
+  background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge-inactive {
+  background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.permission-level-1 {
+  background: linear-gradient(135deg, #91d5ff 0%, #1890ff 100%);
+}
+
+.permission-level-2 {
+  background: linear-gradient(135deg, #b7eb8f 0%, #52c41a 100%);
+}
+
+.permission-level-3 {
+  background: linear-gradient(135deg, #ffe58f 0%, #faad14 100%);
+}
+
+.permission-level-4 {
+  background: linear-gradient(135deg, #ffa39e 0%, #ff4d4f 100%);
+}
+
+.permission-level-5 {
+  background: linear-gradient(135deg, #d3adf7 0%, #722ed1 100%);
+}

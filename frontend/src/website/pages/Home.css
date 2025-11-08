@@ -1,0 +1,307 @@
+/* Hero Section */
+.hero {
+  position: relative;
+  height: 75vh;
+  overflow: hidden;
+  background-color: #22c55e;
+}
+
+.hero-carousel { height: 100%; position: relative; }
+
+.hero-slide {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0; transform: scale(1.1);
+  transition: all 1s ease-in-out;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; color: white; padding: 2rem;
+}
+.hero-slide.active { opacity: 1; transform: scale(1); }
+
+.hero-content { z-index: 2; max-width: 900px; padding: 3rem; }
+
+.hero-title {
+  font-size: 4.5rem; font-weight: 800; text-transform: uppercase;
+  margin-bottom: 1.5rem; animation: slideIn .5s ease-out;
+  color: white; text-shadow: 2px 2px 4px rgba(0,0,0,.5);
+}
+.hero-subtitle {
+  font-size: 1.8rem; margin-bottom: 2.5rem;
+  animation: slideIn .5s ease-out .2s; text-shadow: 1px 1px 2px rgba(0,0,0,.5);
+}
+
+.hero-buttons { display: flex; gap: 2rem; justify-content: center; animation: slideIn .5s ease-out .4s; }
+
+/* =============== BOTONES (idéntico efecto de tu versión que sí funcionaba) =============== */
+.hero-buttons .btn {
+  padding: 1.2rem 3rem;
+  font-size: 1.2rem;
+  border-radius: 2rem;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  border: 2px solid transparent;
+  position: relative;
+  overflow: hidden;  /* mantiene la “capa blanca” dentro del borde */
+  z-index: 0;       /* stacking context */
+  cursor: pointer;
+}
+
+/* Colores base por tipo de botón (salen de variables del slide) */
+.hero-buttons .btn.btn-primary {
+  background-color: var(--btn-primary);
+  color: var(--btn-primary-text);
+}
+
+.hero-buttons .btn.btn-secondary {
+  background-color: var(--btn-secondary);
+  color: var(--btn-secondary-text);
+}
+
+/* Capa blanca (sobre el fondo, bajo el texto) */
+.hero-buttons .btn::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: white;
+  border-radius: 2rem;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.3s ease;
+  z-index: 1;     /* por encima del fondo del botón */
+}
+
+/* Texto siempre encima de la capa blanca */
+.hero-buttons .btn > span {
+  position: relative;
+  z-index: 2;
+}
+
+/* Hover: idéntico a tu “capa blanca” que aparece */
+.hero-buttons .btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  border-color: white;
+  color: #346C60 !important;   /* texto legible sobre el blanco */
+}
+
+.hero-buttons .btn:hover::before {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.hero-buttons .btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Features Section */
+.features { padding: 4rem 0; background-color: #f9fafb; }
+.features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; padding: 2rem; }
+.feature-card { text-align: center; padding: 2rem; background: white; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,.1); transition: transform .3s ease; }
+.feature-card:hover { transform: translateY(-5px); }
+.feature-icon { font-size: 2.5rem; color: #22c55e; margin-bottom: 1rem; }
+
+/* Mission Vision Section */
+.mission-vision { display: grid; grid-template-columns: 1fr 1fr; position: relative; }
+.mission, .vision { padding: 10rem 2rem; color: white; display: flex; align-items: center; justify-content: center; }
+.mission { background-color: rgba(34, 197, 94, 0.85); }
+.vision  { background-color: rgba(234, 179, 8, 0.85); }
+.mission h2, .vision h2 { font-size: 4rem; margin-bottom: 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 900; text-align: center; line-height: 1.2; }
+
+.mission-vision-button {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 2; padding: 1.5rem 4rem; font-size: 1.3rem; background: white; color: #22c55e;
+  border: none; border-radius: 3rem; box-shadow: 0 4px 15px rgba(0,0,0,.2);
+  transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; text-decoration: none;
+}
+.mission-vision-button:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 8px 25px rgba(0,0,0,.3); background: white; color: #eab308; }
+
+/* Featured Food Section */
+.featured-food { padding: 4rem 0; overflow: hidden; background-color: #f9fafb; }
+.food-carousel { display: flex; gap: 2rem; animation: scroll 30s linear infinite; padding: 2rem 0; }
+.food-item { flex: 0 0 200px; height: 250px; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
+.food-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 0.5rem; transition: transform 0.3s ease; }
+.food-item:hover img { transform: scale(1.05); }
+
+/* Visit Section */
+.visit-section {
+  position: relative;
+  color: white;
+  width: 100%;
+  height: 60vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  background: none; /* elimina cualquier color de fondo */
+  border: none;     /* asegura que no haya líneas visibles */
+}
+
+/* Imagen del mapa: ocupa todo el contenedor sin dejar bordes */
+.visit-map-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border: none;
+}
+
+
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.4) 50%, rgba(0, 0, 0, 0.6) 100%);
+  z-index: 1;
+  pointer-events: none;
+  animation: fadeOverlay 1.3s ease forwards;
+  opacity: 0;
+}
+
+.visit-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  padding: 2.5rem 4rem;
+  border-radius: 1rem;
+  min-width: 320px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+  animation: visitFadeUp 1s ease forwards;
+  opacity: 0;
+}
+
+.visit-content h2 {
+  font-size: 1.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.visit-content p {
+  font-size: 1rem;
+  margin: 0.2rem 0;
+}
+
+
+/* Ícono centrado y animado correctamente */
+.location-icon {
+  font-size: 4rem;
+  color: #22c55e;
+  display: block;
+  margin: 0 auto 0.8rem; /* centrado y espaciado justo */
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+  animation: markerBounce 1.8s ease infinite;
+  position: relative;
+  left: 0;
+  top: 0;
+  background: none; /* elimina cualquier color de fondo */
+  border: none; 
+}
+
+/* Animations */
+@keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+@keyframes rotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+
+/* Responsive Design */
+@media (max-width: 1024px) { .features-grid { grid-template-columns: repeat(2, 1fr); } .hero-title { font-size: 2.5rem; } }
+@media (max-width: 768px) { .mission-vision { grid-template-columns: 1fr; } .hero-title { font-size: 2rem; } .hero-subtitle { font-size: 1.2rem; } }
+@media (max-width: 640px) { .features-grid { grid-template-columns: 1fr; } .hero-buttons { flex-direction: column; } }
+
+/* Visit animations */
+@keyframes visitFadeUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -40%) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes markerBounce {
+  0%, 100% {
+    transform: translateY(-5px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Asegura que el slide activo quede arriba y reciba el mouse */
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(1.1);
+  transition: all 1s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: white;
+  padding: 2rem;
+
+  /* <- CLAVE: los slides inactivos NO deben captar eventos */
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-slide.active {
+  opacity: 1;
+  transform: scale(1);
+
+  /* Ajuste de centrado vertical del texto en el hero */
+.hero-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.hero-content {
+  position: relative;
+  top: -10px; /* <-- ajusta este valor (entre -10px y -30px según tu gusto) */
+  transform: translateY(-5%);
+}
+
+.hero-title {
+  line-height: 1.1; /* evita saltos de espacio entre líneas */
+}
+
+.hero-slide img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.hero-content {
+  z-index: 2; /* asegura que quede encima de la imagen */
+}
+
+
+  /* <- CLAVE: el activo sí recibe eventos y queda encima */
+  pointer-events: auto;
+  z-index: 2;
+}

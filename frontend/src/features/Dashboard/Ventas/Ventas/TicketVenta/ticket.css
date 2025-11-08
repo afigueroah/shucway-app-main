@@ -1,0 +1,220 @@
+:root{
+  --ticket-width: 280px;          /* ~80mm */
+  --ticket-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --ink: #111827;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+}
+
+/* Página normal (vista previa dentro del dashboard) */
+.ticket-page{
+  display: grid;
+  place-items: start center;
+  padding: 24px;
+}
+
+.ticket-paper{
+  width: var(--ticket-width);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 6px 28px rgba(0,0,0,.06);
+  color: var(--ink);
+  font-family: var(--ticket-font);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ticket-center{ text-align:center; }
+.ticket-muted{ color: var(--muted); }
+
+.ticket-title{
+  font-weight: 700;
+  letter-spacing: .5px;
+}
+
+.ticket-hr{
+  border: 0;
+  border-top: 1px dashed var(--line);
+  margin: 10px 0;
+}
+
+
+/* ====== Estilos de pantalla (preview) ====== */
+.ticket-wrap {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.ticket-card {
+  width: 360px;
+  max-width: 92vw;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  box-shadow: 0 10px 25px rgba(0,0,0,.06);
+  padding: 16px 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  color: #111827; /* gray-900 */
+}
+
+.ticket-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.ticket-hr {
+  margin: 10px 0;
+  border: 0;
+  border-top: 1px dashed #9ca3af; /* gray-400 */
+}
+
+.ticket-title {
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: .04em;
+}
+
+.ticket-subtitle {
+  text-align: center;
+  font-size: 12px;
+  color: #6b7280; /* gray-500 */
+  margin-bottom: 10px;
+}
+
+.ticket-total {
+  font-weight: 800;
+}
+
+.ticket-muted {
+  color: #6b7280;
+}
+
+.ticket-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+
+@media print {
+  /* Página chica tipo rollo 80mm */
+  @page {
+    size: 80mm auto;
+    margin: 3mm;
+  }
+
+  html, body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Oculta todo */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Muestra solo el ticket */
+  #ticket-root, #ticket-root * {
+    visibility: visible !important;
+  }
+
+  /* Lleva el ticket al (0,0) para que no “desaparezca” */
+  #ticket-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  /* Ajusta el contenedor del preview para impresión */
+  .ticket-card {
+    width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /* No imprimir botones */
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ===== Botones del ticket (mismo look que “+ Nuevo Proveedor”) ===== */
+:root{
+  --btn-green: #01a049;             /* verde de marca */
+  --btn-green-hover: #029342;
+  --btn-green-ring: rgba(1,160,73,.28);
+}
+
+/* contenedor ya existe; sólo reforzamos */
+.ticket-actions{
+  margin-top: 14px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* botón base – funciona para <button> y <a> */
+.ticket-actions .btn {
+  appearance: none;
+  border: 1px solid var(--btn-green);
+  background: var(--btn-green);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  padding: 10px 16px;
+  border-radius: 9999px;          /* píldora */
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;          /* para <a> */
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(1,160,73,.18);
+  transition: background .15s ease, transform .05s ease, box-shadow .15s ease;
+}
+
+.ticket-actions .btn:hover {
+  background: var(--btn-green-hover);
+  box-shadow: 0 4px 12px rgba(1,160,73,.22);
+}
+
+.ticket-actions .btn:active { transform: translateY(1px); }
+.ticket-actions .btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--btn-green-ring);
+}
+
+/* variante opcional “outline” por si quieres dejar uno blanco */
+.ticket-actions .btn-outline {
+  background: #fff;
+  color: var(--btn-green);
+  border-color: var(--btn-green);
+  box-shadow: none;
+}
+.ticket-actions .btn-outline:hover {
+  background: rgba(1,160,73,.06);
+}
+
+/* no imprimirlos (ya usas .no-print, pero por si acaso) */
+@media print {
+  .ticket-actions { display: none !important; }
+}
