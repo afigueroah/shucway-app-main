@@ -15,6 +15,7 @@ const Website = () => {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/contacto" element={<Contact />} />
           <Route path="/nosotros" element={<About />} />
           <Route path="/productos" element={<Products />} />

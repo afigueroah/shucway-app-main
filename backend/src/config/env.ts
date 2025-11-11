@@ -1,8 +1,9 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import path from 'path';
 
 // Cargar variables de entorno
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 // Esquema de validación para las variables de entorno
 const envSchema = z.object({

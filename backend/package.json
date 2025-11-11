@@ -2,8 +2,8 @@
   "$schema": "./package.schema.json",
   "name": "shucway-backend",
   "version": "1.0.0",
-  "type": "module",
   "description": "Backend API para Shucway App con Node.js y Supabase como DB",
+  "type": "commonjs",
   "main": "dist/index.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx src/index.ts",

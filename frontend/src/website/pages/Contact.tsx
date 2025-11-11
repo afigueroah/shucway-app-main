@@ -24,12 +24,10 @@ const Contact = () => {
             e.preventDefault();
 
             const nombre = (e.currentTarget.elements.namedItem("nombre") as HTMLInputElement).value;
-            const correo = (e.currentTarget.elements.namedItem("correo") as HTMLInputElement).value;
             const mensaje = (e.currentTarget.elements.namedItem("mensaje") as HTMLInputElement).value;
 
             const texto = `Hola Shucway %0A
 Mi nombre es: ${nombre}%0A
-Mi correo es: ${correo}%0A
 Mi mensaje es: ${mensaje}%0A`;
 
             window.open(`https://wa.me/50252025909?text=${texto}`, "_blank");
@@ -38,12 +36,6 @@ Mi mensaje es: ${mensaje}%0A`;
               type="text"
               name="nombre"
               placeholder="Nombre Completo *"
-              required
-            />
-            <input
-              type="email"
-              name="correo"
-              placeholder="Correo *"
               required
             />
             <textarea
@@ -61,10 +53,6 @@ Mi mensaje es: ${mensaje}%0A`;
         </div>
         <div className="contact-info-section">
           <div className="contact-info-block">
-            <div>
-              <span className="contact-label">Correo Electronico</span>
-              <p className="contact-value">luisrfp@gmail.com</p>
-            </div>
             <div>
               <span className="contact-label">Numero</span>
               <p className="contact-value">(+502) 5202-5909</p>

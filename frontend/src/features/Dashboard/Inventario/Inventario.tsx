@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Inventario.css';
-import { MdInventory2, MdAddShoppingCart, MdAssignmentTurnedIn } from 'react-icons/md';
+import { MdInventory2, MdAddShoppingCart, MdAssignmentTurnedIn, MdErrorOutline } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Modal, message } from 'antd';
 import Catalogo from './Catalogo';
 import IngresoCompra from './IngresoCompra';
 import Auditoria from './Auditoria';
@@ -283,6 +284,66 @@ const Inventario: React.FC = () => {
                     <div className="inv-card">
                       <h3>Auditorías Pendientes</h3>
                       <div className="number">{auditoriasPendientes}</div>
+                      {auditoriasPendientes > 0 && (
+                        <button 
+                          className="btn primary mt-2" 
+                          onClick={() => {
+                            Modal.confirm({
+                              title: 'Confirmar cancelación de todas las auditorías',
+                              content: '¿Estás seguro de cancelar todas las auditorías pendientes? Esta acción no se puede deshacer.',
+                              okText: 'Sí, cancelar todas',
+                              cancelText: 'No',
+                              okType: 'danger',
+                              onOk: async () => {
+                                try {
+                                  const token = localStore.get('access_token');
+                                  const response = await fetch('http://localhost:3002/api/auditoria/cancelar-todas', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ motivo: 'Canceladas desde Inventario' }),
+                                  });
+                                  if (response.ok) {
+                                    message.success('Auditorías canceladas correctamente.');
+                                    // Refrescar el contador
+                                    const fetchAuditoriasPendientes = async () => {
+                                      try {
+                                        const token = localStore.get('access_token');
+                                        if (!token) return;
+                                        const response = await fetch('http://localhost:3002/api/auditoria/pendientes/count', {
+                                          headers: { 'Authorization': `Bearer ${token}` },
+                                        });
+                                        if (response.ok) {
+                                          const data = await response.json();
+                                          setAuditoriasPendientes(data.count || 0);
+                                        }
+                                      } catch (error) {
+                                        console.error('Error refrescando auditorías:', error);
+                                      }
+                                    };
+                                    fetchAuditoriasPendientes();
+                                  } else {
+                                    const errorData = await response.json();
+                                    const errorMessage = errorData.error || 'Error desconocido';
+                                    console.error('Error cancelando todas las auditorías:', errorData);
+                                    message.error(`Error cancelando todas las auditorías. ${errorMessage}`);
+                                  }
+                                } catch (e: unknown) {
+                                  console.error('Error cancelando todas las auditorías - raw error:', e);
+                                  const errorMessage = e instanceof Error ? e.message : String(e);
+                                  message.error(`Error cancelando todas las auditorías. Revisa la consola para más detalles. ${errorMessage}`);
+                                }
+                              }
+                            });
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                          <MdErrorOutline size={16} />
+                          Cancelar Todas
+                        </button>
+                      )}
                     </div>
                   </div>
 

@@ -3,6 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "main.js",
+  "homepage": "./",
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
@@ -15,12 +17,40 @@
     "build:backend": "npm --prefix backend run build",
     "build:all": "npm run build:backend && npm run build",
     "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
-    "preview": "npm --prefix frontend run preview"
+    "preview": "npm --prefix frontend run preview",
+    "electron": "electron .",
+    "electron-dev": "cross-env NODE_ENV=development electron .",
+    "dist": "npm run build:all && electron-builder --publish never"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.1.1",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
+    "express": "^5.1.0",
     "lucide-react": "^0.552.0"
+  },
+  "build": {
+    "asar": false,
+    "appId": "com.shucway.app",
+    "productName": "Shucway App",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "backend/dist/**/*",
+      "backend/.env",
+      "frontend/dist/**/*",
+      "main.js",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "frontend/public/logo.png",
+      "compression": "store"
+    }
   }
 }

@@ -52,7 +52,7 @@ const Footer = () => {
             <div className="nav-section">
               <h4>Enlaces Rápidos</h4>
               <ul>
-                <li><Link to="/">Inicio</Link></li>
+                <li><a href="/">Inicio</a></li>
                 <li><Link to="/nosotros">Nosotros</Link></li>
                 <li><Link to="/productos">Productos</Link></li>
                 <li><Link to="/contacto">Contacto</Link></li>
@@ -64,10 +64,6 @@ const Footer = () => {
           <div className="footer-contact">
             <h4>Información de Contacto</h4>
             <div className="contact-info">
-              <div className="contact-item">
-                <FaEnvelope />
-                <span>luisrfp@gmail.com</span>
-              </div>
               <div className="contact-item">
                 <FaPhone />
                 <span>(+502) 5202-5909</span>

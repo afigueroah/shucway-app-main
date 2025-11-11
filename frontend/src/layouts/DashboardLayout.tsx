@@ -17,6 +17,7 @@ import { usePermissions } from "../hooks/usePermissions";
 import { useStockMonitoring } from "../hooks/useStockMonitoring";
 import { cajaService, type CajaSesion as CajaSesionApi } from "../api/cajaService";
 import { ventasService } from "../api/ventasService";
+import { getProfile } from "../api/authService";
 
 // usar el logo público (public/img/logo.png)
 const publicLogo = "/img/logo.png";
@@ -96,7 +97,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
         // Intentar obtener perfil actualizado de la API (similar a Perfil.tsx)
         try {
-          const { getProfile } = await import('../api/authService');
           const profile = await getProfile();
           userData = profile;
 

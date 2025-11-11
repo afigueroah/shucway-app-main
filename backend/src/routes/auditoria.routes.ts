@@ -85,7 +85,6 @@ router.get('/lista', authenticateToken, async (_req: AuthRequest, res: Response)
 router.post('/cancelar/:id_auditoria', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { id_auditoria } = req.params;
-    const { motivo } = req.body;
 
     if (!id_auditoria || isNaN(Number(id_auditoria))) {
       return res.status(400).json({ error: 'ID de auditoría inválido' });
@@ -95,9 +94,7 @@ router.post('/cancelar/:id_auditoria', authenticateToken, async (req: AuthReques
     const { error } = await supabase
       .from('auditoria_inventario')
       .update({
-        estado: 'cancelada',
-        observaciones: motivo || 'Cancelada por el usuario',
-        fecha_finalizacion: new Date().toISOString()
+        estado: 'cancelada'
       })
       .eq('id_auditoria', Number(id_auditoria));
 
@@ -109,6 +106,33 @@ router.post('/cancelar/:id_auditoria', authenticateToken, async (req: AuthReques
     return res.json({ message: 'Auditoría cancelada exitosamente' });
   } catch (error) {
     console.error('Error en POST /auditoria/cancelar:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+/**
+ * POST /auditoria/cancelar-todas
+ * Cancela todas las auditorías en progreso
+ */
+router.post('/cancelar-todas', authenticateToken, async (_req: AuthRequest, res: Response) => {
+  try {
+
+    // Actualizar el estado de todas las auditorías en progreso a 'cancelada'
+    const { error } = await supabase
+      .from('auditoria_inventario')
+      .update({
+        estado: 'cancelada'
+      })
+      .eq('estado', 'en_progreso');
+
+    if (error) {
+      console.error('Error cancelando todas las auditorías:', error);
+      return res.status(500).json({ error: 'Error al cancelar auditorías' });
+    }
+
+    return res.json({ message: 'Todas las auditorías en progreso han sido canceladas exitosamente' });
+  } catch (error) {
+    console.error('Error en POST /auditoria/cancelar-todas:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

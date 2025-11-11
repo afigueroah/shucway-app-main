@@ -13,6 +13,7 @@ import "./Auditoria.css";
 import { MdCheckCircle, MdEventNote, MdErrorOutline } from "react-icons/md";
 import { FaUserCircle } from "react-icons/fa";
 import { PiBroomBold } from "react-icons/pi";
+import { message } from "antd";
 import { useAuth } from "../../../../hooks/useAuth";
 import { supabase } from "../../../../api/supabaseClient";
 import { localStore } from "../../../../utils/storage";
@@ -977,6 +978,8 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
     } catch (error) {
       console.error("Error cancelando auditoría:", error);
       
+      message.error(`Error cancelando auditoría. ${error instanceof Error ? error.message : String(error)}`);
+      
       // Aún si hay error de red, limpiamos el estado local
       setSessionEstado('cancelada');
       localStorage.setItem('auditoria_estado', 'cancelada');
@@ -1008,11 +1011,6 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
       pendingNavigation();
       setPendingNavigation(null);
     }
-  }
-
-  function handleSaveAndExit() {
-    setShowCancelConfirmModal(false);
-    setShowFinalizeModal(true);
   }
 
   // ===== Cerrar modal de éxito y navegar =====
@@ -1629,19 +1627,12 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
             </ul>
 
             <div className="mt-6 flex gap-3 justify-end flex-wrap">
-              <button
-                className="btn primary"
-                onClick={handleSaveAndExit}
-                style={{ minWidth: 140 }}
-              >
-                Guardar cambios
-              </button>
               <button 
                 className="btn ghost" 
                 onClick={handleContinueWithoutCancel}
-                style={{ minWidth: 110 }}
+                style={{ minWidth: 140 }}
               >
-                Continuar
+                Guardar cambios
               </button>
               <button 
                 className="btn" 
@@ -1651,9 +1642,13 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
                   minWidth: 140,
                   background: "linear-gradient(135deg, #001f3f 0%, #003d7a 100%)",
                   color: "#fff",
-                  border: "none"
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
                 }}
               >
+                <MdErrorOutline size={16} />
                 {isCanceling ? "Cancelando..." : "Cancelar Auditoría"}
               </button>
             </div>

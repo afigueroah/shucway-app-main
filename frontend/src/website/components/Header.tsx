@@ -36,7 +36,7 @@ const Header = () => {
     <header className={`header ${scrolled ? 'scrolled' : ''}`}>
       <div className="header-container">
         <div className="logo">
-          <NavLink to="/" className="logo-link">
+          <NavLink to="/home" className="logo-link">
             <img src="/img/logo.png" alt="Shucway" className="header-logo logo-hover" />
           </NavLink>
         </div>
@@ -44,7 +44,7 @@ const Header = () => {
           <ul className="nav-list">
             <li className="nav-module">
               <FaHome className="nav-icon" />
-              <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Inicio</NavLink>
+              <NavLink to="/home" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Inicio</NavLink>
             </li>
             <li className="nav-module">
               <FaUsers className="nav-icon" />
