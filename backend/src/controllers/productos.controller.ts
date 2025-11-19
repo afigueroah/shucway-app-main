@@ -46,13 +46,43 @@ export class ProductosController {
 
   async createCategoria(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { nombre, descripcion } = req.body;
-      const categoria = await productosService.createCategoria(nombre, descripcion);
+      const { nombre_categoria, descripcion, estado } = req.body;
+      const categoria = await productosService.createCategoria(nombre_categoria, descripcion, estado);
 
       res.status(201).json({
         success: true,
         data: categoria,
         message: 'Categoría creada exitosamente',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateCategoria(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id);
+      const { nombre_categoria, descripcion, estado } = req.body;
+      const categoria = await productosService.updateCategoria(id, nombre_categoria, descripcion, estado);
+
+      res.json({
+        success: true,
+        data: categoria,
+        message: 'Categoría actualizada exitosamente',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteCategoria(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id);
+      await productosService.deleteCategoria(id);
+
+      res.json({
+        success: true,
+        message: 'Categoría eliminada exitosamente',
       });
     } catch (error) {
       next(error);

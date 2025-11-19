@@ -20,6 +20,7 @@ import {
   PiFloppyDiskBold,
   PiPlusBold,
   PiArrowLeftBold,
+  PiMoneyBold,
 } from "react-icons/pi";
 import { useAuth } from '../../../../../hooks/useAuth';
 import { PermissionLevel } from '../../../../../constants/permissions';
@@ -654,6 +655,15 @@ export default function ProductosPage() {
                 className="h-11 rounded-xl px-4 text-base font-semibold text-white flex items-center gap-2 bg-[#12443D] hover:bg-[#0f3833]"
               >
                 📖 Ver Recetario
+              </button>
+            )}
+            {canManageProductos && (
+              <button
+                onClick={() => navigate('/productos/categorias')}
+                className="h-11 rounded-xl px-4 text-base font-semibold text-white flex items-center gap-2 bg-green-800 hover:bg-green-900"
+              >
+                <PiMoneyBold />
+                Gestión Gastos Operativo
               </button>
             )}
             {canManageProductos && (

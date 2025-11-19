@@ -19,6 +19,7 @@
     "dayjs": "^1.11.13",
     "emailjs-com": "^3.2.0",
     "framer-motion": "^10.18.0",
+    "html2pdf.js": "^0.12.1",
     "jspdf": "^3.0.3",
     "lucide-react": "^0.542.0",
     "pg": "^8.16.3",

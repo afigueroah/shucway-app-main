@@ -21,6 +21,8 @@ router.use(authenticateToken);
 router.get('/categorias', requireCajero, productosController.getCategorias.bind(productosController));
 router.get('/categorias/:id', requireCajero, productosController.getCategoriaById.bind(productosController));
 router.post('/categorias', requireAdministrador, productosController.createCategoria.bind(productosController));
+router.put('/categorias/:id', requireAdministrador, productosController.updateCategoria.bind(productosController));
+router.delete('/categorias/:id', requireAdministrador, productosController.deleteCategoria.bind(productosController));
 
 // ================== PRODUCTOS ==================
 // Nivel mínimo: Cajero (30) para consultar, Administrador (80) para modificar

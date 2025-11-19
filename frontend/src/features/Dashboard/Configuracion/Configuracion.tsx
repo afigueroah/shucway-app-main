@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DatabaseOutlined, CloudUploadOutlined, HistoryOutlined } from '@ant-design/icons';
 import mantenimientoImg from '/img/mantenimiento.jpg';
 import backupImg from '/img/Backup.jpg';
+import resetImg from '/img/config.jpg';
 
 interface RecentChange {
   id: number;
@@ -134,6 +135,12 @@ const Configuracion: React.FC = () => {
       img: backupImg,
       route: '/configuracion/backup',
       description: 'Generar y gestionar backups'
+    },
+    {
+      name: 'Reinicio de datos',
+      img: resetImg,
+      route: '/configuracion/reinicio-datos',
+      description: 'Reiniciar registros de módulos'
     }
   ];
 
@@ -146,7 +153,7 @@ const Configuracion: React.FC = () => {
       </header>
 
       {/* Opciones principales - SIEMPRE ARRIBA */}
-  <section className="w-full max-w-screen-xl mx-auto mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+  <section className="w-full max-w-screen-xl mx-auto mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
         {options.map((option) => (
           <div
             key={option.name}

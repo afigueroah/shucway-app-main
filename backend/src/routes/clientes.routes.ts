@@ -32,5 +32,6 @@ router.get('/:id/puntos', requireCajero, clientesController.consultarPuntos.bind
 router.post('/:id/puntos/gestionar', requireCajero, clientesController.gestionarPuntos.bind(clientesController));
 router.post('/puntos/canjear', requireCajero, clientesController.canjearPuntos.bind(clientesController));
 router.get('/:id/historial-puntos', requireCajero, clientesController.getHistorialPuntos.bind(clientesController));
+router.get('/:id/producto-favorito', requireCajero, clientesController.getProductoFavorito.bind(clientesController));
 
 export default router;

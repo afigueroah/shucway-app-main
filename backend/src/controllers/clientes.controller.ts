@@ -172,6 +172,20 @@ export class ClientesController {
       next(error);
     }
   }
+
+  async getProductoFavorito(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const idCliente = parseInt(req.params.id);
+      const favorito = await clientesService.getProductoFavorito(idCliente);
+
+      res.json({
+        success: true,
+        data: favorito,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const clientesController = new ClientesController();

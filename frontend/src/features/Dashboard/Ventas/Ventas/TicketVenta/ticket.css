@@ -6,6 +6,31 @@
   --line: #e5e7eb;
 }
 
+/* ====== Compatibilidad para las clases "tk-" usadas en el ticket ====== */
+.tk-header{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding-bottom:8px;
+}
+.tk-logo-wrap{ flex: 0 0 100px; }
+.tk-logo{ width:100px; height:auto; display:block; }
+.tk-header-info{ flex:1; display:flex; flex-direction:column; gap:2px; }
+.tk-title{ font-weight:800; font-size:20px; letter-spacing:.06em; color:var(--ink); }
+.tk-subtitle{ font-size:12px; color:var(--muted); }
+.tk-subdate{ font-size:12px; color:var(--muted); }
+.tk-sep{ height:1px; background:var(--line); margin:10px 0; border-radius:2px; }
+.tk-row{ display:grid; grid-template-columns: 1fr auto; gap:8px 10px; align-items:baseline; }
+.tk-label{ font-weight:600; color:var(--ink); }
+.tk-value{ text-align:right; color:var(--ink); }
+.tk-muted{ color:var(--muted); }
+.tk-strong{ font-weight:800; }
+
+.tk-footer{ margin-top:12px; text-align:center; font-size:12px; color:var(--muted); }
+.tk-thanks{ font-weight:700; margin-bottom:6px; }
+.tk-dashes{ color:var(--muted); font-size:11px; }
+
+
 /* Página normal (vista previa dentro del dashboard) */
 .ticket-page{
   display: grid;
@@ -155,6 +180,12 @@
   .no-print {
     display: none !important;
   }
+}
+
+@media print {
+  .tk-logo{ width: 140px !important; }
+  .tk-title{ font-size: 22px !important; }
+  .tk-row{ font-size: 14px !important; }
 }
 
 /* ===== Botones del ticket (mismo look que “+ Nuevo Proveedor”) ===== */

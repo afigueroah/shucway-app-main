@@ -2,32 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Shucway - Web</title>
-    <!-- Intento robusto: si existe el chunk `react-vendor` (generado por Vite) lo importamos como módulo y exponemos
-         React en `window.React` antes de que otros módulos se ejecuten. Esto evita depender de `require` en el renderer.
-         El script es seguro en navegadores normales (no hará import si no encuentra el chunk). -->
-    <script type="module">
-      (async () => {
-        try {
-          // Buscar el link de modulepreload creado por Vite para react-vendor
-          const links = Array.from(document.querySelectorAll('link[rel="modulepreload"]'));
-          const reactLink = links.find(l => l.getAttribute('href')?.includes('react-vendor')) ||
-                            links.find(l => l.getAttribute('href')?.includes('/react-vendor'));
-          if (reactLink) {
-            const href = reactLink.getAttribute('href');
-            // Importar el chunk y exponer React
-            const mod = await import(/* @vite-ignore */ href);
-            // React se exporta como default o como nombres; normalizar
-            window.React = (mod && (mod.default || mod.React || mod)) || window.React;
-          }
-        } catch (e) {
-          // No bloquear en producción; el bundle seguirá exponiendo React si es necesario
-          console.warn('No se pudo importar react-vendor dinámicamente:', e);
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

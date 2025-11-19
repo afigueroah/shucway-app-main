@@ -240,6 +240,30 @@ export class VentasController {
     }
   }
 
+  async getTransferenciasSesion(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const fechaInicio = req.query.fechaInicio as string;
+
+      if (!fechaInicio) {
+        res.status(400).json({
+          success: false,
+          message: 'fechaInicio es requerido',
+        });
+        return;
+      }
+
+      const transferencias = await ventasService.getTransferenciasSesion(fechaInicio);
+
+      res.json({
+        success: true,
+        data: transferencias,
+        count: transferencias.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getVentasPorCajero(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const idCajero = parseInt(req.params.idCajero);
@@ -308,6 +332,38 @@ export class VentasController {
         success: true,
         data: productos,
         count: productos.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateEstadoTransferencia(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const idVenta = parseInt(req.params.id);
+      const { estado } = req.body as { estado: 'esperando' | 'recibido' };
+
+      if (isNaN(idVenta) || idVenta <= 0) {
+        res.status(400).json({
+          success: false,
+          message: 'ID de venta inválido',
+        });
+        return;
+      }
+
+      if (!estado || !['esperando', 'recibido'].includes(estado)) {
+        res.status(400).json({
+          success: false,
+          message: 'Estado inválido. Debe ser "esperando" o "recibido"',
+        });
+        return;
+      }
+
+      await ventasService.updateEstadoTransferencia(idVenta, estado);
+
+      res.json({
+        success: true,
+        message: `Estado de transferencia actualizado a ${estado}`,
       });
     } catch (error) {
       next(error);

@@ -299,12 +299,13 @@ CREATE TABLE venta (
     id_venta SERIAL PRIMARY KEY, 
     fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     id_cliente INTEGER REFERENCES cliente(id_cliente),
-    tipo_pago VARCHAR(20) DEFAULT 'Cash' CHECK (tipo_pago IN ('Cash', 'Transferencia', 'Paggo', 'Tarjeta')),
+    tipo_pago VARCHAR(20) DEFAULT 'Cash' CHECK (tipo_pago IN ('Cash', 'Transferencia', 'Paggo', 'Tarjeta', 'Canje', 'Cupon')),
     estado VARCHAR(20) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'confirmada', 'completada', 'cancelada')),
     total_venta DECIMAL(12,2) DEFAULT 0,
     total_costo DECIMAL(12,2) DEFAULT 0,
     ganancia DECIMAL(12,2) GENERATED ALWAYS AS (total_venta - total_costo) STORED,
     id_cajero INTEGER REFERENCES perfil_usuario(id_perfil), 
+    acumula_puntos BOOLEAN DEFAULT TRUE,
     notas TEXT
 );
 
@@ -426,6 +427,20 @@ CREATE TABLE historial_puntos (
     fecha_movimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     id_cajero INTEGER REFERENCES perfil_usuario(id_perfil)
 );
+
+-- Función para consultar puntos del cliente (fallback sencillo sobre columna puntos_acumulados)
+CREATE OR REPLACE FUNCTION fn_consultar_puntos(p_id_cliente INTEGER)
+RETURNS INTEGER AS $$
+DECLARE
+    v_puntos INTEGER := 0;
+BEGIN
+    SELECT COALESCE(puntos_acumulados, 0) INTO v_puntos
+    FROM cliente
+    WHERE id_cliente = p_id_cliente;
+
+    RETURN v_puntos;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ===============================================================
 -- MÓDULO: Bitácoras de Auditoría
@@ -2272,16 +2287,20 @@ CREATE OR REPLACE FUNCTION fn_acumular_puntos_venta(p_id_venta INTEGER, p_id_caj
 RETURNS VOID AS $$
 DECLARE
     v_id_cliente INTEGER;
+    v_acumula_puntos BOOLEAN;
     v_puntos_anteriores INTEGER;
     v_puntos_nuevos INTEGER;
 BEGIN
-    -- Obtener el cliente de la venta
-    SELECT id_cliente INTO v_id_cliente
+    -- Obtener el cliente y si acumula puntos de la venta
+    SELECT id_cliente, acumula_puntos INTO v_id_cliente, v_acumula_puntos
     FROM venta
     WHERE id_venta = p_id_venta;
 
-    -- Si no hay cliente, no acumular puntos
-    IF v_id_cliente IS NULL THEN
+    RAISE NOTICE 'Procesando puntos para venta %, cliente %, acumula_puntos %', p_id_venta, v_id_cliente, v_acumula_puntos;
+
+    -- Si no hay cliente o no acumula puntos, no acumular
+    IF v_id_cliente IS NULL OR v_acumula_puntos = FALSE THEN
+        RAISE NOTICE 'No hay cliente o no acumula puntos, saliendo';
         RETURN;
     END IF;
 
@@ -2290,14 +2309,25 @@ BEGIN
     FROM cliente
     WHERE id_cliente = v_id_cliente;
 
+    RAISE NOTICE 'Puntos anteriores: %', v_puntos_anteriores;
+
     -- Calcular nuevos puntos (1 punto por venta)
     v_puntos_nuevos := v_puntos_anteriores + 1;
+
+    -- Si llega a 10 puntos, reiniciar a 0
+    IF v_puntos_nuevos >= 10 THEN
+        v_puntos_nuevos := 0;
+    END IF;
+
+    RAISE NOTICE 'Puntos nuevos: %', v_puntos_nuevos;
 
     -- Actualizar puntos del cliente
     UPDATE cliente
     SET puntos_acumulados = v_puntos_nuevos,
         ultima_compra = CURRENT_TIMESTAMP
     WHERE id_cliente = v_id_cliente;
+
+    RAISE NOTICE 'Cliente actualizado';
 
     -- Registrar en historial de puntos
     INSERT INTO historial_puntos (
@@ -2312,13 +2342,15 @@ BEGIN
     ) VALUES (
         v_id_cliente,
         p_id_venta,
-        'acumulacion',
+        CASE WHEN v_puntos_nuevos = 0 THEN 'reset' ELSE 'acumulacion' END,
         v_puntos_anteriores,
-        1,
+        CASE WHEN v_puntos_nuevos = 0 THEN -v_puntos_anteriores ELSE 1 END,
         v_puntos_nuevos,
-        'Punto acumulado por venta',
+        CASE WHEN v_puntos_nuevos = 0 THEN 'Reset de puntos después de 10 acumulaciones' ELSE 'Punto acumulado por venta' END,
         p_id_cajero
     );
+
+    RAISE NOTICE 'Historial insertado';
 
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -2377,17 +2409,12 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION trg_acumular_puntos_venta()
 RETURNS TRIGGER AS $$
 BEGIN
+    RAISE NOTICE 'Trigger trg_acumular_puntos_venta ejecutado para venta %', NEW.id_venta;
     -- Solo ejecutar cuando la venta se confirma por primera vez
     IF (TG_OP = 'INSERT' AND NEW.estado = 'confirmada') OR
        (TG_OP = 'UPDATE' AND NEW.estado = 'confirmada' AND COALESCE(OLD.estado, '') <> 'confirmada') THEN
-        -- Verificar que no sea un canje de puntos (para evitar loops)
-        IF NOT EXISTS (
-            SELECT 1 FROM detalle_venta
-            WHERE id_venta = NEW.id_venta
-            AND es_canje_puntos = true
-        ) THEN
-            PERFORM fn_acumular_puntos_venta(NEW.id_venta, NEW.id_cajero);
-        END IF;
+        RAISE NOTICE 'Llamando a fn_acumular_puntos_venta para venta %', NEW.id_venta;
+        PERFORM fn_acumular_puntos_venta(NEW.id_venta, NEW.id_cajero);
     END IF;
 
     RETURN NEW;
@@ -2399,3 +2426,6 @@ CREATE TRIGGER trg_acumular_puntos_venta
 AFTER INSERT OR UPDATE OF estado ON venta
 FOR EACH ROW
 EXECUTE FUNCTION trg_acumular_puntos_venta();
+
+-- Agregar campo para estado de transferencias
+ALTER TABLE venta ADD COLUMN IF NOT EXISTS estado_transferencia VARCHAR(20) DEFAULT 'esperando' CHECK (estado_transferencia IN ('esperando', 'recibido'));

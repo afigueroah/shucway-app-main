@@ -104,4 +104,15 @@ export const clientesService = {
       throw error;
     }
   },
+
+  // Obtener producto favorito de un cliente
+  async getProductoFavorito(idCliente: number): Promise<{ producto: string; cantidad: number } | null> {
+    try {
+      const response = await apiClient.get(`/clientes/${idCliente}/producto-favorito`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error obteniendo producto favorito:', error);
+      throw error;
+    }
+  },
 };

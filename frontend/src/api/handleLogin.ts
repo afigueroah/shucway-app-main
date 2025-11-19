@@ -23,13 +23,13 @@ export const handleLogin = async (
       console.log('Guardando token en storage optimizado:', token ? 'Token presente' : 'Token ausente');
       
       // Guardar en localStorage optimizado con expiración
-      localStore.set('access_token', token, { expires: 60 * 24 * 7 }); // 7 días
+      localStore.set('access_token', token, { expires: 60 * 24 * 1 }); // 1 día
       localStore.set('refreshToken', refreshToken, { expires: 60 * 24 * 30 }); // 30 días
       localStore.set('user', user, { expires: 60 * 24 * 7 }); // 7 días
 
       // También guardar en cookies para persistencia adicional
       cookieStore.set('auth_session', JSON.stringify({ token, user }), {
-        expires: 60 * 24 * 7, // 7 días
+        expires: 60 * 24 * 1, // 1 día
         secure: true,
         sameSite: 'strict'
       });

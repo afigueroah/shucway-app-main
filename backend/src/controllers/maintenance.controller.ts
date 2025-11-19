@@ -105,6 +105,24 @@ export const maintenanceController = {
 			const message = error instanceof Error ? error.message : 'Error al eliminar el registro';
 			res.status(400).json({ message });
 		}
+	},
+
+	async executeSql(req: Request, res: Response) {
+		const { sql } = req.body;
+
+		if (!sql || typeof sql !== 'string') {
+			res.status(400).json({ message: 'SQL requerido' });
+			return;
+		}
+
+		try {
+			await maintenanceService.executeSql(sql);
+			res.json({ message: 'SQL ejecutado exitosamente' });
+		} catch (error) {
+			console.error('Error al ejecutar SQL:', error);
+			const message = error instanceof Error ? error.message : 'Error al ejecutar SQL';
+			res.status(400).json({ message });
+		}
 	}
 };
 

@@ -2,7 +2,6 @@
   "name": "shucway-app",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
   "main": "main.js",
   "homepage": "./",
   "scripts": {
@@ -29,8 +28,20 @@
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "lucide-react": "^0.552.0"
+    "@supabase/supabase-js": "^2.57.4",
+    "bcrypt": "^5.1.1",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.552.0",
+    "pg": "^8.16.3",
+    "serverless-http": "^4.0.0",
+    "winston": "^3.17.0",
+    "zod": "^3.24.1"
   },
   "build": {
     "asar": false,

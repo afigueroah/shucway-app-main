@@ -11,6 +11,6 @@ router.get('/tables/:tableName/columns', maintenanceController.getTableColumns);
 router.get('/tables/:tableName/records', maintenanceController.getTableData);
 router.post('/tables/:tableName/records', maintenanceController.createRecord);
 router.put('/tables/:tableName/records/:id', maintenanceController.updateRecord);
-router.delete('/tables/:tableName/records/:id', maintenanceController.deleteRecord);
+router.post('/execute-sql', maintenanceController.executeSql);
 
 export default router;

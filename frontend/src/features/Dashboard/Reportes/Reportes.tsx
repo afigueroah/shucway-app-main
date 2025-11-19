@@ -13,6 +13,7 @@ import {
   Wallet,
   Receipt,
 } from "lucide-react";
+import html2pdf from 'html2pdf.js';
 import {
   ResponsiveContainer,
   PieChart,
@@ -396,26 +397,18 @@ const Reportes: React.FC = () => {
     `).join("");
 
     const html = `
-<!doctype html><html><head><meta charset="utf-8"/>
-<title>Reportes</title>
-<style>
-body{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;margin:16px;color:#111}
-h1{margin:0 0 4px 0} .muted{color:#6b7280; font-size:12px}
-table{font-size:12px}
-@media print { .no-print{display:none} }
-</style></head>
-<body>
+<div style="font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;margin:16px;color:#111">
   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px">
     <div>
-      <h1>Reportes</h1>
-      <div class="muted">Rango: ${rangoTxt}</div>
+      <h1 style="margin:0 0 4px 0">Reportes</h1>
+      <div style="color:#6b7280; font-size:12px">Rango: ${rangoTxt}</div>
     </div>
-    <div class="muted">${new Date().toLocaleString()}</div>
+    <div style="color:#6b7280; font-size:12px">${new Date().toLocaleString()}</div>
   </div>
   <h3 style="margin:12px 0 6px 0">KPIs</h3>
   ${kpiHtml}
   <h3 style="margin:14px 0 6px 0">Productos (según filtros)</h3>
-  <table style="width:100%; border-collapse:collapse">
+  <table style="width:100%; border-collapse:collapse; font-size:12px">
     <thead>
       <tr>
         <th style="text-align:left; padding:6px; border:1px solid #e5e7eb">#</th>
@@ -429,11 +422,26 @@ table{font-size:12px}
     </thead>
     <tbody>${rowsHtml || `<tr><td colspan="7" style="padding:10px;color:#6b7280">Sin datos</td></tr>`}</tbody>
   </table>
-  <script>setTimeout(()=>window.print(),300)</script>
-</body></html>`;
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.open(); w.document.write(html); w.document.close();
+</div>`;
+
+    // Crear elemento temporal
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
+
+    const opt = {
+      margin: 0.5,
+      filename: `reportes-${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(tempDiv).save().then(() => {
+      document.body.removeChild(tempDiv);
+    });
   }
 
   function handleGastosOperativos() {

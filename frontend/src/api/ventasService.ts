@@ -10,7 +10,8 @@ export interface Venta {
   fecha_venta: string;
   id_cliente?: number;
   estado: 'pendiente' | 'confirmada' | 'completada' | 'cancelada';
-  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia';
+  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia' | 'Canje' | 'Cupon';
+  estado_transferencia?: 'esperando' | 'recibido';
   total_venta: number;
   total_costo: number;
   ganancia: number;
@@ -44,7 +45,8 @@ export interface DetalleVenta {
   es_canje_puntos: boolean;
   puntos_canjeados: number;
   producto?: {
-    nombre: string;
+    nombre?: string;
+    nombre_producto?: string;
   };
   variante?: {
     nombre_variante: string;
@@ -74,10 +76,14 @@ export interface ProductoPopular {
 // DTOs para crear ventas
 export interface CreateVentaDTO {
   id_cliente?: number;
-  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia';
+  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia' | 'Canje' | 'Cupon';
   puntos_usados?: number;
+  acumula_puntos?: boolean;
   notas?: string;
   detalles: CreateDetalleVentaDTO[];
+  // Información adicional para transferencias
+  numero_referencia?: string;
+  nombre_banco?: string;
 }
 
 export interface CreateDetalleVentaDTO {
@@ -212,6 +218,36 @@ export const ventasService = {
       return response.data.data;
     } catch (error) {
       console.error('Error creando venta:', error);
+      throw error;
+    }
+  },
+  async deleteVenta(id: number): Promise<void> {
+    try {
+      const response = await apiClient.delete(`/ventas/${id}`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error eliminando venta:', error);
+      throw error;
+    }
+  },
+
+  // Obtener transferencias de la sesión
+  async getTransferenciasSesion(fechaInicio: string): Promise<Venta[]> {
+    try {
+      const response = await apiClient.get(`/ventas/transferencias-sesion?fechaInicio=${fechaInicio}`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error obteniendo transferencias de sesión:', error);
+      throw error;
+    }
+  },
+
+  // Actualizar estado de transferencia
+  async updateEstadoTransferencia(idVenta: number, data: { estado: 'esperando' | 'recibido' }): Promise<void> {
+    try {
+      await apiClient.put(`/ventas/${idVenta}/transferencia`, data);
+    } catch (error) {
+      console.error('Error actualizando estado de transferencia:', error);
       throw error;
     }
   },

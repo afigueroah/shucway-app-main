@@ -4,7 +4,8 @@ import dbSchema, { TableMeta } from './dbSchema';
 import api from '@/api/apiClient';
 import { localStore } from '@/utils/storage';
 import { FaEye, FaEdit, FaTrash, FaPlus, FaFilter, FaColumns, FaUndo, FaSearch, FaChevronRight, FaDatabase } from 'react-icons/fa';
-import { Button, Spin, Table, message, Modal, Input, Select, Form, Drawer, Switch, Dropdown, Tag, Alert, Empty } from 'antd';
+import { Button, Spin, Table, message, Modal, Input, Select, Form, Drawer, Switch, Dropdown, Tag, Alert, Empty, Upload } from 'antd';
+import { RollbackOutlined, UploadOutlined } from '@ant-design/icons';
 import { ColumnsType } from 'antd/es/table';
 
 interface TableRecord {
@@ -87,7 +88,34 @@ const Mantenimiento: React.FC = () => {
   const [tablePageSize, setTablePageSize] = useState<number>(10);
   const [tableCurrentPage, setTableCurrentPage] = useState<number>(1);
   const [tableSearch, setTableSearch] = useState<string>('');
-  const [lastError, setLastError] = useState<string | null>(null);
+  const [restoreModalVisible, setRestoreModalVisible] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestoreBackup = async () => {
+    if (!restoreFile) {
+      message.error('Selecciona un archivo de backup');
+      return;
+    }
+
+    setRestoring(true);
+    try {
+      const text = await restoreFile.text();
+      await api.post('/maintenance/execute-sql', { sql: text });
+      message.success('Backup restaurado exitosamente');
+      setRestoreModalVisible(false);
+      setRestoreFile(null);
+      // Recargar datos si hay tabla seleccionada
+      if (selectedTable) {
+        await loadTableData(selectedTable);
+      }
+    } catch (error) {
+      console.error('Error al restaurar backup:', error);
+      message.error('Error al restaurar backup');
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   // metadata schema for the currently selected table (if available)
   const schemaForSelected: TableMeta | undefined = selectedTable ? SCHEMA_TABLE_MAP[selectedTable] : undefined;
@@ -195,15 +223,10 @@ const Mantenimiento: React.FC = () => {
     const loadAvailableTables = async () => {
       try {
         // Usar el nuevo endpoint optimizado que devuelve todas las tablas disponibles en una sola llamada
-  const response = await fetch('/api/dashboard/available-tables', {
-          headers: {
-            'Authorization': `Bearer ${localStore.get('access_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await api.get('/dashboard/available-tables');
 
-        if (response.ok) {
-          const data = await response.json();
+        if (response.status === 200) {
+          const data = response.data;
           setTables(data.tables);
         } else if (response.status === 401) {
           message.error('Sesión expirada. Redirigiendo al login...');
@@ -219,7 +242,7 @@ const Mantenimiento: React.FC = () => {
       } catch (error) {
         console.error('Error al cargar tablas:', error);
         // fallback to local schema list
-  setTables(SCHEMA_TABLE_KEYS);
+        setTables(SCHEMA_TABLE_KEYS);
       }
     };
 
@@ -288,14 +311,9 @@ const Mantenimiento: React.FC = () => {
 
           if (match) {
             try {
-              const resp = await fetch(`/api/dashboard/table-data/${match}`, {
-                headers: {
-                  'Authorization': `Bearer ${localStore.get('access_token')}`,
-                  'Content-Type': 'application/json'
-                }
-              });
-              if (!resp.ok) continue;
-              const js = await resp.json();
+              const resp = await api.get(`/dashboard/table-data/${match}`);
+              if (resp.status !== 200) continue;
+              const js = resp.data;
               const rows = js.data || [];
 
               // prefer labelField and pk from schema for the matched table
@@ -335,14 +353,9 @@ const Mantenimiento: React.FC = () => {
   const fetchLookupOptionsRemote = async (table: string, query: string) => {
     try {
       const q = query ? `?q=${encodeURIComponent(query)}&limit=50` : '?limit=50';
-      const resp = await fetch(`/api/dashboard/table-data/${table}${q}`, {
-        headers: {
-          'Authorization': `Bearer ${localStore.get('access_token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (!resp.ok) return [];
-      const js = await resp.json();
+      const resp = await api.get(`/dashboard/table-data/${table}${q}`);
+      if (resp.status !== 200) return [];
+      const js = resp.data;
       const rows = js.data || [];
       if (!rows || rows.length === 0) return [];
       const labelField = ((): string => {
@@ -433,15 +446,10 @@ const Mantenimiento: React.FC = () => {
 
   const fetchColumnNames = useCallback(async (tableName: string): Promise<string[]> => {
     try {
-  const response = await fetch(`/api/dashboard/table-columns/${tableName}`, {
-        headers: {
-          'Authorization': `Bearer ${localStore.get('access_token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await api.get(`/dashboard/table-columns/${tableName}`);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (response.status === 200) {
+        const data = response.data;
         return (data.columns || []).map((c: { column_name: string }) => c.column_name);
       } else if (response.status === 401) {
         message.error('Sesión expirada. Redirigiendo al login...');
@@ -465,15 +473,10 @@ const Mantenimiento: React.FC = () => {
     setLastError(null);
     try {
       const filtersParam = Object.keys(filters).length > 0 ? `?filters=${encodeURIComponent(JSON.stringify(filters))}` : '';
-      const response = await fetch(`/api/dashboard/table-data/${selectedTable}${filtersParam}`, {
-        headers: {
-          'Authorization': `Bearer ${localStore.get('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await api.get(`/dashboard/table-data/${selectedTable}${filtersParam}`);
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.status === 200) {
+        const result = response.data;
         const rows = result.data || [];
 
         if (rows.length > 0) {
@@ -1057,12 +1060,21 @@ const Mantenimiento: React.FC = () => {
             </h1>
             <p className="text-gray-600">Gestiona las tablas de la base de datos de forma eficiente</p>
           </div>
-          <button
-            onClick={() => navigate(-1)}
-            className="self-start rounded-md border bg-white px-3 py-2 text-sm shadow-sm transition hover:bg-gray-50"
-          >
-            ← Regresar
-          </button>
+          <div className="flex gap-2">
+            <Button
+              type="primary"
+              icon={<RollbackOutlined />}
+              onClick={() => setRestoreModalVisible(true)}
+            >
+              Restaurar Backup
+            </Button>
+            <button
+              onClick={() => navigate(-1)}
+              className="self-start rounded-md border bg-white px-3 py-2 text-sm shadow-sm transition hover:bg-gray-50"
+            >
+              ← Regresar
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-6 xl:flex-row">
@@ -1381,6 +1393,29 @@ const Mantenimiento: React.FC = () => {
             {renderFormFields()}
           </Form>
         </Drawer>
+
+        <Modal
+          title="Restaurar Backup"
+          open={restoreModalVisible}
+          onOk={handleRestoreBackup}
+          onCancel={() => setRestoreModalVisible(false)}
+          confirmLoading={restoring}
+          okText="Restaurar"
+          cancelText="Cancelar"
+        >
+          <p>Selecciona un archivo SQL de backup para restaurar la base de datos.</p>
+          <Upload
+            beforeUpload={(file) => {
+              setRestoreFile(file);
+              return false;
+            }}
+            maxCount={1}
+            accept=".sql"
+          >
+            <Button icon={<UploadOutlined />}>Seleccionar archivo SQL</Button>
+          </Upload>
+          {restoreFile && <p>Archivo seleccionado: {restoreFile.name}</p>}
+        </Modal>
       </div>
     </div>
   );

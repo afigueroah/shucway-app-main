@@ -16,8 +16,9 @@ export interface Venta {
   id_venta: number;
   id_cliente?: number;
   fecha_venta: Date;
-  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia';
+  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia' | 'Canje' | 'Cupon';
   estado: 'pendiente' | 'confirmada' | 'completada' | 'cancelada';
+  estado_transferencia?: 'esperando' | 'recibido';
   id_cajero?: number;
   total_venta: number;
   total_costo: number;
@@ -68,10 +69,14 @@ export interface BitacoraVentas {
 
 export interface CreateVentaDTO {
   id_cliente?: number;
-  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia';
+  tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia' | 'Canje' | 'Cupon';
   puntos_usados?: number;
+  acumula_puntos?: boolean;
   notas?: string;
   detalles: CreateDetalleVentaDTO[];
+  // Información adicional para transferencias
+  numero_referencia?: string;
+  nombre_banco?: string;
 }
 
 export interface CreateDetalleVentaDTO {

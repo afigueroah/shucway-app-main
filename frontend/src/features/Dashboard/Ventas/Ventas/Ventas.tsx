@@ -9,7 +9,9 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationContainer } from '@/components/NotificationContainer';
 import { useAuth } from '../../../../hooks/useAuth';
 import { PermissionLevel } from '../../../../constants/permissions';
-import { Trash2, X, Check, Edit3, Minus, Plus, ShoppingCart, UserX, CreditCard } from 'lucide-react';
+import { cajaService } from '../../../../api/cajaService';
+import { localStore } from '../../../../utils/storage';
+import { Trash2, X, Check, Edit3, Minus, Plus, ShoppingCart, UserX, CreditCard, Gift } from 'lucide-react';
 
 type Insumo = {
   id_insumo: number;
@@ -214,10 +216,18 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
 
   // Carrito
   const [carrito, setCarrito] = useState<CartItem[]>([]);
-  const [ordenN, setOrdenN] = useState<number>(1);
+  const [ordenN, setOrdenN] = useState<number>(() => {
+    const saved = localStorage.getItem('ordenN');
+    return saved ? parseInt(saved, 10) : 1;
+  });
 
   // Cliente seleccionado
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+
+  // Guardar ordenN en localStorage
+  useEffect(() => {
+    localStorage.setItem('ordenN', ordenN.toString());
+  }, [ordenN]);
 
   // Cargar datos del backend al montar el componente
   useEffect(() => {
@@ -239,15 +249,38 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
           ...categoriasData
         ];
         setCategorias(categoriasConTodos);
-        setProductos(productosData);
+
+        // Filtrar productos: solo aquellos con categoría activa
+        const categoriasActivas = categoriasConTodos.filter(c => c.estado === 'activo');
+        const productosFiltrados = productosData.filter(p => p.id_categoria && categoriasActivas.some(c => c.id_categoria == p.id_categoria));
+        setProductos(productosFiltrados);
+
         setClientes(clientesData);
+
+        // Cargar estado de caja
+        try {
+          const estado = await cajaService.getEstado();
+          if (estado.abierta && estado.sesion) {
+            // Sesión abierta
+          }
+        } catch (error) {
+          console.warn('Error cargando estado de caja:', error);
+        }
 
         // Cargar totales de la sesión actual
         try {
-          const fechaInicio = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-          const totalesSesion = await ventasService.getTotalVentasSesion(fechaInicio);
-          setTotalCaja(totalesSesion.efectivo);
-          setTotalBanco(totalesSesion.transferencia + totalesSesion.tarjeta);
+          const estado = await cajaService.getEstado();
+          if (estado.abierta && estado.sesion) {
+            const totalesSesion = await ventasService.getTotalVentasSesion(estado.sesion.fecha_apertura);
+            setTotalCaja(totalesSesion.efectivo);
+            setTotalBanco(totalesSesion.transferencia + totalesSesion.tarjeta);
+          } else {
+            // Si no hay sesión abierta, usar fecha de hoy
+            const fechaInicio = new Date().toISOString().split('T')[0];
+            const totalesSesion = await ventasService.getTotalVentasSesion(fechaInicio);
+            setTotalCaja(totalesSesion.efectivo);
+            setTotalBanco(totalesSesion.transferencia + totalesSesion.tarjeta);
+          }
         } catch (sessionError) {
           console.warn('No se pudieron cargar los totales de la sesión:', sessionError);
           // Mantener valores por defecto (0) si falla la carga
@@ -282,11 +315,26 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
     isOpen: false,
     itemToDelete: null
   });
+  // Modal de confirmación para canje gratis
+  const [confirmCanje, setConfirmCanje] = useState(false);
+  const [puntosEnabled, setPuntosEnabled] = useState<boolean>(() => localStore.get('puntosEnabled', false) ?? false);
+
+  // Verificar cambios en puntosEnabled cada 1 segundo
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const current = localStore.get('puntosEnabled', false) ?? false;
+      if (current !== puntosEnabled) {
+        console.log('🔄 puntosEnabled cambió de', puntosEnabled, 'a', current);
+        setPuntosEnabled(current);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [puntosEnabled]);
   // Cantidades de extras en el customizer
   // Drawer de pago
   const [openPago, setOpenPago] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
-  const [metodo, setMetodo] = useState<'efectivo' | 'transferencia'>('efectivo');
+  const [metodo, setMetodo] = useState<'efectivo' | 'transferencia' | 'canje_gratis' | 'cupon'>('efectivo');
   const [referencia, setReferencia] = useState('');
   const [banco, setBanco] = useState('');
 
@@ -297,6 +345,24 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
   //totales de caja y banco (recuento)
   const [totalCaja, setTotalCaja] = useState<number>(0);
   const [totalBanco, setTotalBanco] = useState<number>(0);
+  const loadTotalesSesion = useCallback(async () => {
+    try {
+      const estado = await cajaService.getEstado();
+      if (estado.abierta && estado.sesion) {
+        const totalesSesion = await ventasService.getTotalVentasSesion(estado.sesion.fecha_apertura);
+        setTotalCaja(totalesSesion.efectivo);
+        setTotalBanco(totalesSesion.transferencia + totalesSesion.tarjeta);
+      } else {
+        // Si no hay sesión, usar hoy
+        const fechaInicio = new Date().toISOString().split('T')[0];
+        const totalesSesion = await ventasService.getTotalVentasSesion(fechaInicio);
+        setTotalCaja(totalesSesion.efectivo);
+        setTotalBanco(totalesSesion.transferencia + totalesSesion.tarjeta);
+      }
+    } catch (error) {
+      console.warn('Error recargando totales de sesión:', error);
+    }
+  }, []);
 
   // Drawer de personalización
   const [openCustom, setOpenCustom] = useState(false);
@@ -746,16 +812,6 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
   /* ============================================================
      Modales menores
      ============================================================ */
-  const handleOpenCategoriaModal = (mode: 'create' | 'edit' = 'create', categoria?: CategoriaProducto) => {
-    if (!ensureCanManageCategorias()) {
-      return;
-    }
-    setCategoriaModal({
-      isOpen: true,
-      mode,
-      categoria: categoria || null
-    });
-  };
 
   const handleCloseCategoriaModal = () => {
     setCategoriaModal({
@@ -1020,9 +1076,6 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
      ============================================================ */
   const irAPago = () => {
     if (!carrito.length) return addNotification({ type: 'warning', title: 'Carrito vacío', message: 'Agrega productos a la orden' });
-    if (!clienteSeleccionado) {
-      return addNotification({ type: 'warning', title: 'Selecciona un cliente', message: 'Debes elegir un cliente antes de continuar al pago.' });
-    }
     setPagoError('');
     setCashInvalid(false);
     setTransfInvalid(false);
@@ -1133,13 +1186,9 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
 
   const confirmarPago = async () => {
     if (!carrito.length) return addNotification({ type: 'warning', title: 'Carrito vacío', message: 'Tu carrito está vacío.' });
-    if (!clienteSeleccionado) {
-      addNotification({ type: 'warning', title: 'Selecciona un cliente', message: 'Debes elegir un cliente antes de confirmar el pago.' });
-      return;
-    }
 
-    if (metodo === 'transferencia' && (!referencia.trim() || !banco.trim())) {
-      setPagoError('Ingresa número de referencia y banco de origen.');
+    if (metodo === 'transferencia' && (!referencia.trim() || !banco.trim() || !clienteSeleccionado)) {
+      setPagoError('Ingresa número de referencia, banco de origen y selecciona un cliente.');
       setTransfInvalid(true);
       setCashInvalid(false);
       return;
@@ -1167,9 +1216,11 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
       }
 
       // Crear el payload para la venta
+      console.log('🛒 Creando venta con puntosEnabled:', puntosEnabled);
       const ventaData: CreateVentaDTO = {
-        id_cliente: clienteSeleccionado.id_cliente,
-        tipo_pago: metodo === 'efectivo' ? 'Cash' : metodo === 'transferencia' ? 'Transferencia' : 'Paggo',
+        id_cliente: clienteSeleccionado?.id_cliente,
+        tipo_pago: metodo === 'efectivo' ? 'Cash' : metodo === 'transferencia' ? 'Transferencia' : metodo === 'cupon' ? 'Cupon' : 'Paggo',
+        acumula_puntos: puntosEnabled,
         notas: notasVenta.trim() ? notasVenta.trim() : undefined,
         detalles: carrito.map((item) => ({
           id_producto: item.producto.id_producto,
@@ -1180,6 +1231,11 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
           es_canje_puntos: false,
           puntos_canjeados: 0,
         })),
+        // Agregar información de transferencia si es el método seleccionado
+        ...(metodo === 'transferencia' && {
+          numero_referencia: referencia.trim(),
+          nombre_banco: banco.trim()
+        }),
       };
 
       // Crear la venta en el backend
@@ -1188,6 +1244,9 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
       // Actualizar recuentos Caja / Banco
       if (metodo === 'efectivo') setTotalCaja((v) => v + total);
       else setTotalBanco((v) => v + total);
+
+      // Refrescar totales desde backend para asegurar sincronización
+      await loadTotalesSesion();
 
       // Construir payload del ticket
       const recibido = metodo === 'efectivo' ? Number(dineroRecibido || 0) : null;
@@ -1274,6 +1333,129 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
 
       const fallbackMessage =
         error instanceof Error ? error.message : 'Error al procesar la venta. Inténtalo de nuevo.';
+
+      // Mostrar error dentro del modal
+      setModalError(fallbackMessage);
+    }
+  };
+
+  const confirmarCanjeGratis = async () => {
+    if (!carrito.length) return addNotification({ type: 'warning', title: 'Carrito vacío', message: 'Tu carrito está vacío.' });
+
+    // Setting metodo to canje_gratis to ensure UI hides cash inputs
+    setMetodo('canje_gratis');
+    setDineroRecibido('');
+
+    try {
+      const stockOk = await validarStockCarrito();
+      if (!stockOk) {
+        return;
+      }
+
+      // Crear el payload para la venta (canje gratis)
+      const ventaData: CreateVentaDTO = {
+        id_cliente: clienteSeleccionado?.id_cliente,
+        tipo_pago: 'Canje',
+        acumula_puntos: puntosEnabled,
+        notas: notasVenta.trim() ? `${notasVenta.trim()} - CANJE GRATIS` : 'CANJE GRATIS',
+        puntos_usados: carrito.reduce((sum, it) => sum + (10 * it.qty), 0),
+        detalles: carrito.map((item) => ({
+          id_producto: item.producto.id_producto,
+          id_variante: item.id_variante,
+          cantidad: item.qty,
+          precio_unitario: 0, // Precio 0 para canje gratis
+          descuento: 0,
+          es_canje_puntos: true,
+          puntos_canjeados: 10 * item.qty,
+        })),
+      };
+
+      // Crear la venta en el backend (tipo_pago distinto para evitar registrar ingreso en caja)
+      const ventaCreada = await ventasService.createVenta(ventaData);
+
+      // Construir payload del ticket
+      const ticketData = {
+        ordenN,
+        ventaId: ventaCreada.id_venta,
+        cliente: clienteSeleccionado,
+        items: carrito.map((it) => ({
+          id: it.producto.id_producto,
+          nombre: it.producto.nombre_producto,
+          variante: it.variant?.nombre_variante ?? null,
+          qty: it.qty,
+          precio: 0, // Precio 0 para canje gratis
+          mods: it.mods || null,
+          subtotal: 0,
+        })),
+        total: 0, // Total 0 para canje gratis
+        metodo: 'canje_gratis',
+        efectivo: null,
+        transferencia: null,
+        fechaHora: new Date().toISOString(),
+        notas: notasVenta.trim() ? `${notasVenta.trim()} - CANJE GRATIS` : 'CANJE GRATIS',
+      };
+
+      try {
+        sessionStorage.setItem('ticketventa:last', JSON.stringify(ticketData));
+      } catch (error) {
+        console.warn('No se pudo guardar el ticket en sessionStorage:', error);
+      }
+
+      addNotification({
+        type: 'success',
+        title: 'Canje gratis confirmado',
+        message: 'El canje gratis se registró exitosamente. Inventario actualizado correctamente. Generando ticket...',
+        duration: 4000,
+      });
+
+      // Reset y cierre del drawer
+      setOrdenN((n) => n + 1);
+      limpiar();
+      setClienteSeleccionado(null);
+      setMetodo('efectivo');
+      setReferencia('');
+      setBanco('');
+      setDineroRecibido('');
+      setNotasVenta('');
+      setOpenPago(false);
+      setConfirmCanje(false);
+
+      // Navegar directamente (el toast se muestra en Ticket)
+      navigate('/ventas/ticketventa', { state: ticketData });
+    } catch (error) {
+      console.error('Error creando el canje gratis:', error);
+
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const apiMessage =
+          (error.response?.data?.message as string | undefined) ??
+          (error.response?.data?.error as string | undefined) ??
+          error.message;
+
+        if (status === 403 && (apiMessage?.toLowerCase().includes('caja') ?? true)) {
+          const reason = apiMessage ?? 'Debes abrir la caja antes de registrar ventas.';
+          addNotification({
+            type: 'warning',
+            title: 'Caja cerrada',
+            message: reason,
+            duration: 5000,
+          });
+          setOpenPago(false);
+          navigate('/ventas/cierre-caja', {
+            state: { requireOpenCaja: true, reason },
+          });
+          return;
+        }
+
+        const message = apiMessage ?? 'Error al procesar el canje gratis. Inténtalo de nuevo.';
+
+        // Mostrar error dentro del modal
+        setModalError(message);
+        return;
+      }
+
+      const fallbackMessage =
+        error instanceof Error ? error.message : 'Error al procesar el canje gratis. Inténtalo de nuevo.';
 
       // Mostrar error dentro del modal
       setModalError(fallbackMessage);
@@ -1372,14 +1554,6 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                     <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" /></svg>
                   </span>
                 </div>
-                {canManageCategorias && (
-                  <button
-                    onClick={() => handleOpenCategoriaModal('create')}
-                    className="h-12 px-5 rounded-xl text-base font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow"
-                  >
-                    + Categoría
-                  </button>
-                )}
               </div>
             </motion.div>
 
@@ -1521,6 +1695,12 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                       )}
                     </div>
                   </div>
+
+                  {clienteSeleccionado && clienteSeleccionado.puntos_acumulados === 9 && (
+                    <div className="mb-4 text-sm text-orange-600 font-medium bg-orange-50 border border-orange-200 rounded-lg p-3">
+                      ⚠️ ¡La próxima compra es gratis! (9 puntos acumulados)
+                    </div>
+                  )}
 
                   {/* Recuento CAJA / BANCO */}
                   <div className="mb-4 rounded-xl border border-dashed border-gray-200 p-4 bg-gray-50/60">
@@ -1751,7 +1931,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                 </div>
 
                 {/* Métodos de pago */}
-                <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="mt-6 grid grid-cols-3 gap-3">
                   <button
                     aria-pressed={metodo === 'efectivo'}
                     onClick={() => { setMetodo('efectivo'); setPagoError(''); setCashInvalid(false); }}
@@ -1773,6 +1953,17 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                     }`}
                   >
                     TRANSFERENCIA
+                  </button>
+                  <button
+                    aria-pressed={metodo === 'cupon'}
+                    onClick={() => { setMetodo('cupon'); setPagoError(''); setCashInvalid(false); }}
+                    className={`h-12 rounded-lg px-4 font-semibold text-xl border transition ${
+                      metodo === 'cupon'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-inner'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    CUPÓN
                   </button>
                 </div>
 
@@ -1809,6 +2000,9 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                 {/* Referencia/Banco solo cuando sea TRANSFERENCIA */}
                 {metodo === 'transferencia' && (
                   <div className="mt-5 space-y-4">
+                    <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                      <strong>Nota:</strong> Para pagos con transferencia es obligatorio seleccionar un cliente.
+                    </div>
                     <div>
                       <label className="text-xl font-medium text-gray-600">Número de referencia</label>
                       <input
@@ -1861,12 +2055,20 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                   </div>
                 )}
 
-                <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="mt-6 grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setOpenPago(false)}
                     className="h-12 rounded-lg bg-gray-100 text-gray-700 font-semibold text-base hover:bg-gray-200"
                   >
                     Cancelar
+                  </button>
+                  <button
+                    onClick={() => setConfirmCanje(true)}
+                    disabled={!carrito.length || !puntosEnabled}
+                    className="h-12 rounded-lg bg-purple-600 text-white font-semibold text-base hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Gift size={18} />
+                    Canje Gratis
                   </button>
                   <button
                     onClick={confirmarPago}
@@ -1877,6 +2079,19 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                     Pagar ahora
                   </button>
                 </div>
+                {/* Confirm canje modal */}
+                {confirmCanje && (
+                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md border">
+                      <div className="text-lg font-bold mb-2">Confirmar Canje Gratis</div>
+                      <div className="mb-4">¿Deseas confirmar el canje gratis? Esta operación generará una venta con total Q0.00 y no se registrará ingreso en caja.</div>
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => setConfirmCanje(false)} className="h-10 rounded-lg border px-4">Cancelar</button>
+                        <button onClick={confirmarCanjeGratis} className="h-10 rounded-lg bg-emerald-600 px-4 text-white">Confirmar</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </Card>
             </div>
           </DrawerRight>

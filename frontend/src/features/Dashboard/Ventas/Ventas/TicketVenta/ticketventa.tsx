@@ -19,7 +19,7 @@ type TicketData = {
   cliente: TicketCliente;
   items: TicketItem[];
   total: number;
-  metodo: "efectivo" | "transferencia";
+  metodo: "efectivo" | "transferencia" | "canje_gratis";
   efectivo: { dineroRecibido: number | null; cambio: number | null } | null;
   transferencia: { referencia: string; banco: string } | null;
   fechaHora: string;
@@ -101,7 +101,7 @@ const TicketVenta: React.FC = () => {
     if (!data?.fechaHora) return "—";
     try {
       const d = new Date(data.fechaHora);
-      return d.toLocaleString();
+      return d.toLocaleString('es-ES', { timeZone: 'UTC' });
     } catch {
       return "—";
     }
@@ -175,19 +175,19 @@ const TicketVenta: React.FC = () => {
       {/* Ticket */}
       <div id="ticket-root" className="ticket-paper">
         <div className="tk-header">
-          <div className="tk-title">SHUCWAY</div>
+          <div className="tk-logo-wrap">
+            <img src="/img/logo.png" alt="Shucway" className="tk-logo" />
+          </div>
+          <div className="tk-header-info">
+            <div className="tk-title">SHUCWAY</div>
+            <div className="tk-subtitle">Orden #{data?.ordenN ?? '—'}</div>
+            <div className="tk-subdate">{fechaStr}</div>
+          </div>
         </div>
 
         <div className="tk-sep" />
 
-        <div className="tk-row">
-          <span className="tk-label">Orden</span>
-          <span className="tk-value"> #{data?.ordenN ?? "—"}</span>
-        </div>
-        <div className="tk-row">
-          <span className="tk-label">Fecha:</span>
-          <span className="tk-value">{fechaStr}</span>
-        </div>
+        {/* Order and date are shown in the header now; keep them here if you want a duplicate */}
 
         {data?.notas && (
           <>
@@ -196,7 +196,7 @@ const TicketVenta: React.FC = () => {
               <span className="tk-label">Notas</span>
             </div>
             <div className="tk-row">
-              <span className="tk-value">{data.notas}</span>
+              <span className="tk-value">{data.notas?.toUpperCase()}</span>
             </div>
           </>
         )}
@@ -268,7 +268,14 @@ const TicketVenta: React.FC = () => {
         <div className="tk-row">
           <span className="tk-label">Método: </span>
           <span className="tk-value">
-            {data?.metodo === "efectivo" ? "Efectivo" : "Transferencia"}
+            {data?.metodo === "efectivo"
+              ? "Efectivo"
+              : data?.metodo === "transferencia"
+              ? "Transferencia"
+              : data?.metodo === "canje_gratis"
+              ? "Canje Gratis"
+              : "—"
+            }
           </span>
         </div>
 

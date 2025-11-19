@@ -256,7 +256,7 @@ export class AuthService {
       }
     };
 
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' }); // 7 días
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' }); // 1 día para testing
   }
 
   // Generar refresh token

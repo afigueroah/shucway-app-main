@@ -10,6 +10,7 @@ import {
   Info,
   Pencil,
   Plus,
+  Minus,
   RefreshCw,
   Search,
   Trash2,
@@ -18,6 +19,7 @@ import {
   Star,
 } from "lucide-react";
 import { clientesService, type Cliente } from "../../../api/clientesService";
+import { localStore } from "../../../utils/storage";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
@@ -70,6 +72,8 @@ export default function Clientes() {
   const [cantidadPuntos, setCantidadPuntos] = useState(0);
   const [motivoPuntos, setMotivoPuntos] = useState('');
   const [procesandoPuntos, setProcesandoPuntos] = useState(false);
+  const [favoriteProduct, setFavoriteProduct] = useState<{ producto: string; cantidad: number } | null>(null);
+  const [puntosEnabled, setPuntosEnabled] = useState(() => localStore.get('puntosEnabled', false));
 
   useEffect(() => {
     loadData(true);
@@ -94,6 +98,13 @@ export default function Clientes() {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const togglePuntos = () => {
+    const newState = !puntosEnabled;
+    setPuntosEnabled(newState);
+    localStore.set('puntosEnabled', newState);
+    message.success(`Sistema de puntos ${newState ? 'activado' : 'desactivado'}`);
   };
 
   const stats = useMemo(() => {
@@ -218,9 +229,25 @@ export default function Clientes() {
     }
   };
 
-  const openDetailModal = (cliente: Cliente) => {
+  const openDetailModal = async (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setDetailOpen(true);
+    try {
+      const favorito = await clientesService.getProductoFavorito(cliente.id_cliente);
+      setFavoriteProduct(favorito);
+    } catch (e) {
+      console.error('Error obteniendo producto favorito:', e);
+      setFavoriteProduct(null);
+    }
+  };
+
+  const openPuntosModal = async (cliente: Cliente) => {
+    setClientePuntos(cliente);
+    setPuntosActuales(cliente.puntos_acumulados);
+    setPuntosOperacion('agregar');
+    setCantidadPuntos(cliente.puntos_acumulados);
+    setMotivoPuntos('');
+    setPuntosModalOpen(true);
   };
 
   const openEditDrawer = (cliente: Cliente) => {
@@ -315,15 +342,6 @@ export default function Clientes() {
     }
   };
 
-  const openPuntosModal = async (cliente: Cliente) => {
-    setClientePuntos(cliente);
-    setPuntosActuales(cliente.puntos_acumulados);
-    setPuntosOperacion('agregar');
-    setCantidadPuntos(0);
-    setMotivoPuntos('');
-    setPuntosModalOpen(true);
-  };
-
   const closePuntosModal = () => {
     setPuntosModalOpen(false);
     setClientePuntos(null);
@@ -334,6 +352,12 @@ export default function Clientes() {
     e.preventDefault();
     if (!clientePuntos || cantidadPuntos <= 0) return;
 
+    const token = localStore.get('access_token');
+    if (!token) {
+      message.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      return;
+    }
+
     setProcesandoPuntos(true);
     try {
       // Llamar a la API para gestionar puntos
@@ -341,7 +365,7 @@ export default function Clientes() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operacion: puntosOperacion,
@@ -351,7 +375,8 @@ export default function Clientes() {
       });
 
       if (!response.ok) {
-        throw new Error('Error al gestionar puntos');
+        const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(errorData.error || 'Error al gestionar puntos');
       }
 
       message.success(`${puntosOperacion === 'agregar' ? 'Agregados' : 'Restados'} ${cantidadPuntos} puntos exitosamente`);
@@ -359,7 +384,12 @@ export default function Clientes() {
       await loadData();
     } catch (err) {
       console.error('Error procesando puntos:', err);
-      message.error('Error al procesar la operación de puntos');
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      if (errorMessage.includes('jwt expired') || errorMessage.includes('Token inválido')) {
+        message.error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+      } else {
+        message.error(`Error al procesar la operación de puntos: ${errorMessage}`);
+      }
     } finally {
       setProcesandoPuntos(false);
     }
@@ -437,7 +467,7 @@ export default function Clientes() {
       >
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/ventas")}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-gray-700 border border-gray-200 font-medium shadow-sm hover:bg-gray-50 transition-all"
           >
             <span>←</span>
@@ -462,6 +492,18 @@ export default function Clientes() {
           >
             <Plus className="h-4 w-4" />
             <span>Nuevo Cliente</span>
+          </button>
+
+          <button
+            onClick={togglePuntos}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+              puntosEnabled
+                ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            <Star className="h-4 w-4" />
+            <span>Sistema de Puntos: {puntosEnabled ? 'Activado' : 'Desactivado'}</span>
           </button>
         </div>
       </motion.div>
@@ -754,6 +796,13 @@ export default function Clientes() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Última Compra</label>
                     <p className="text-sm text-gray-900">{formatDate(selectedCliente.ultima_compra)}</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Producto Favorito</label>
+                    <p className="text-sm text-gray-900">
+                      {favoriteProduct ? `${favoriteProduct.producto} (${favoriteProduct.cantidad} unidades)` : 'No disponible'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1099,24 +1148,26 @@ export default function Clientes() {
                         <button
                           type="button"
                           onClick={() => setPuntosOperacion('agregar')}
-                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                             puntosOperacion === 'agregar'
                               ? 'bg-green-600 text-white'
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                         >
-                          ➕ Agregar
+                          <Plus className="h-4 w-4" />
+                          Agregar
                         </button>
                         <button
                           type="button"
                           onClick={() => setPuntosOperacion('restar')}
-                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                             puntosOperacion === 'restar'
                               ? 'bg-red-600 text-white'
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                         >
-                          ➖ Restar
+                          <Minus className="h-4 w-4" />
+                          Restar
                         </button>
                       </div>
                     </div>

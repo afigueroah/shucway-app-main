@@ -10,11 +10,14 @@ const Configuracion = React.lazy(() => import("../features/Dashboard/Configuraci
 const Mantenimiento = React.lazy(() => import("../features/Dashboard/Configuracion/Mantenimiento"));
 const ConsultasSQL = React.lazy(() => import("../features/Dashboard/Configuracion/ConsultasSQL"));
 const Backup = React.lazy(() => import("../features/Dashboard/Configuracion/Backup"));
+const ReinicioDatos = React.lazy(() => import("../features/Dashboard/Configuracion/ReinicioDatos"));
 const Ventas = React.lazy(() => import("../features/Dashboard/Ventas"));
 const VentasPuntoVenta = React.lazy(() => import("../features/Dashboard/Ventas/Ventas/Ventas"));
 const VentasProducto = React.lazy(() => import("../features/Dashboard/Ventas/Ventas/Producto"));
 const VentasCierreCaja = React.lazy(() => import("../features/Dashboard/Ventas/Ventas/CierreCaja"));
 const TicketVenta = React.lazy(() => import("../features/Dashboard/Ventas/Ventas/TicketVenta"));
+const HistorialVentasCompleto = React.lazy(() => import('../features/Dashboard/Ventas/Ventas/HistorialVentas'));
+const CategoriasProductos = React.lazy(() => import("../features/Dashboard/Ventas/Categorias"));
 const Clientes = React.lazy(() => import("../features/Dashboard/Clientes"));
 const Inventario = React.lazy(() => import("../features/Dashboard/Inventario"));
 const GestionCategorias = React.lazy(() => import("../features/Dashboard/Inventario/Categorias"));
@@ -84,6 +87,13 @@ const protectedRoutes: IRoute[] = [
     requiredLevel: MODULE_PERMISSIONS.BACKUP,
   },
   {
+    path: "/configuracion/reinicio-datos",
+    element: ReinicioDatos,
+    guard: AuthGuard,
+    layout: DashboardLayout,
+    requiredLevel: MODULE_PERMISSIONS.CONFIGURACION,
+  },
+  {
     path: "/administracion",
     element: Usuarios,
     guard: AuthGuard,
@@ -128,6 +138,20 @@ const protectedRoutes: IRoute[] = [
   {
     path: "/ventas/ticketventa",
     element: TicketVenta,
+    guard: AuthGuard,
+    layout: DashboardLayout,
+    requiredLevel: MODULE_PERMISSIONS.VENTAS,
+  },
+  {
+    path: "/ventas/historial",
+    element: HistorialVentasCompleto,
+    guard: AuthGuard,
+    layout: DashboardLayout,
+    requiredLevel: MODULE_PERMISSIONS.VENTAS,
+  },
+  {
+    path: "/productos/categorias",
+    element: CategoriasProductos,
     guard: AuthGuard,
     layout: DashboardLayout,
     requiredLevel: MODULE_PERMISSIONS.VENTAS,

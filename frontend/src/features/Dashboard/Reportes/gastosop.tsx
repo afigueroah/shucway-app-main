@@ -26,6 +26,7 @@ import gastosOperativosService, {
   GastoOperativo,
   UpdateGastoDTO,
 } from "../../../api/gastosOperativosService";
+import html2pdf from 'html2pdf.js';
 
 type DateFilterValue = 30 | 90 | 365 | "all";
 
@@ -434,12 +435,6 @@ export default function GastosOperativos() {
   };
 
   const handleExportPDF = () => {
-    const target = window.open("", "_blank");
-    if (!target) {
-      alert("Habilita las ventanas emergentes para descargar el PDF.");
-      return;
-    }
-
     const escapeHtml = (value: string) =>
       value
         .replace(/&/g, "&amp;")
@@ -497,30 +492,18 @@ export default function GastosOperativos() {
       </table>
     `;
 
-    const html = `<!doctype html>
-<html><head><meta charset="utf-8" />
-<title>Gastos Operativos</title>
-<style>
-  body{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:16px;color:#111}
-  h1{margin:0 0 8px 0}
-  .muted{color:#6b7280;font-size:12px}
-  table{font-size:12px;border-collapse:collapse;width:100%}
-  th{background:#f8fafc}
-  @media print {.no-print{display:none}}
-</style>
-</head>
-<body>
+    const html = `
+<div style="font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:16px;color:#111">
   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px">
     <div>
-      <h1>Gastos Operativos</h1>
-      <div class="muted">Generado: ${new Date().toLocaleString()}</div>
-      <div class="muted">Filtros activos: categoría ${categoriaFilter === "all" ? "Todas" : categoriaFilter}, frecuencia ${frecuenciaFilter === "all" ? "Todas" : frecuenciaFilter}</div>
+      <h1 style="margin:0 0 8px 0">Gastos Operativos</h1>
+      <div style="color:#6b7280;font-size:12px">Generado: ${new Date().toLocaleString()}</div>
+      <div style="color:#6b7280;font-size:12px">Filtros activos: categoría ${categoriaFilter === "all" ? "Todas" : categoriaFilter}, frecuencia ${frecuenciaFilter === "all" ? "Todas" : frecuenciaFilter}</div>
     </div>
-    <button class="no-print" onclick="window.print()" style="padding:6px 12px;border-radius:6px;border:1px solid #0f766e;background:#0f766e;color:#fff;cursor:pointer">Imprimir</button>
   </div>
   ${resumenHtml}
   <h3 style="margin:16px 0 8px 0">Detalle de gastos (${filteredGastos.length})</h3>
-  <table>
+  <table style="font-size:12px;border-collapse:collapse;width:100%">
     <thead>
       <tr>
         <th style="padding:6px;border:1px solid #e5e7eb;text-align:left">#</th>
@@ -538,19 +521,26 @@ export default function GastosOperativos() {
       ${rowsHtml || `<tr><td colspan="9" style="padding:12px;border:1px solid #e5e7eb;text-align:center;color:#6b7280">Sin registros para los filtros actuales.</td></tr>`}
     </tbody>
   </table>
-</body></html>`;
+</div>`;
 
-    target.document.open();
-    target.document.write(html);
-    target.document.close();
-    target.focus();
-    setTimeout(() => {
-      try {
-        target.print();
-      } catch (error) {
-        console.error("No se pudo iniciar la impresión del PDF", error);
-      }
-    }, 200);
+    // Crear elemento temporal
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
+
+    const opt = {
+      margin: 0.5,
+      filename: `gastos-operativos-${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(tempDiv).save().then(() => {
+      document.body.removeChild(tempDiv);
+    });
   };
 
   const cards = [

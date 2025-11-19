@@ -220,6 +220,16 @@ export const maintenanceService = {
 	getPrimaryKey(tableName: string): string {
 		return getMaintenancePrimaryKey(tableName) ?? 'id';
 	},
+
+	async executeSql(sql: string) {
+		const { error } = await supabase.rpc('execute_sql', { sql_query: sql });
+
+		if (error) {
+			throw new Error(error.message);
+		}
+
+		return { success: true };
+	},
 };
 
 export default maintenanceService;

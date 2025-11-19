@@ -162,9 +162,18 @@ const VentasDashboard: React.FC = () => {
   };
 
   // Función para ver detalles de venta
-  const verDetallesVenta = (ventaId: string) => {
-    // Por ahora solo navega a la página de ventas, pero se puede mejorar para mostrar detalles específicos
-    navigate('/ventas/ventas', { state: { ventaId: ventaId.replace('#', '') } });
+  const [selectedVentaFull, setSelectedVentaFull] = useState<unknown | null>(null);
+  const [confirmDeleteVenta, setConfirmDeleteVenta] = useState<number | null>(null);
+
+  const verDetallesVenta = async (ventaId: number | string) => {
+    try {
+      const id = Number(String(ventaId).replace('#', ''));
+      const full = await ventasService.getVentaCompleta(id);
+      setSelectedVentaFull(full);
+    } catch (err) {
+      console.error('Error al obtener detalles de venta:', err);
+      setError('Error al obtener detalles de la venta');
+    }
   };
 
   // Cargar ventas con filtros aplicados
@@ -506,6 +515,7 @@ const VentasDashboard: React.FC = () => {
           <div className="mb-4 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Historial de ventas</h2>
+              <button onClick={() => navigate('/ventas/historial')} className="ml-4 text-sm text-emerald-700 font-semibold">Ver más</button>
 
               {/* Rango de fechas */}
               <div className="relative">
@@ -710,7 +720,7 @@ const VentasDashboard: React.FC = () => {
                     </span>
                   </td>
                   <td className="p-3">
-                    <button
+                      <button
                       onClick={() => verDetallesVenta(v.id)}
                       className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
                       title="Ver detalles"
@@ -729,6 +739,62 @@ const VentasDashboard: React.FC = () => {
               )}
             </tbody>
           </table>
+
+          {/* Modal ver detalles */}
+          {selectedVentaFull && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40">
+              <div className="bg-white p-6 rounded-xl shadow-xl max-w-3xl w-full">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Detalles Venta #{selectedVentaFull.id_venta}</h3>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setSelectedVentaFull(null)} className="h-8 rounded-lg border px-3">Cerrar</button>
+                  </div>
+                </div>
+                <div className="mb-3 text-sm text-gray-600">Fecha: {new Date(selectedVentaFull.fecha_venta).toLocaleString()}</div>
+                <table className="w-full border-collapse mb-4">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="px-3 py-2 text-sm">Cantidad</th>
+                      <th className="px-3 py-2 text-sm">Producto</th>
+                      <th className="px-3 py-2 text-sm">Variante</th>
+                      <th className="px-3 py-2 text-sm">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedVentaFull.detalles || []).map((d: unknown) => (
+                      <tr key={d.id_detalle} className="border-b hover:bg-gray-50">
+                        <td className="px-3 py-2">{d.cantidad}</td>
+                        <td className="px-3 py-2">{d.producto?.nombre || '—'}</td>
+                        <td className="px-3 py-2">{d.variante?.nombre_variante || '—'}</td>
+                        <td className="px-3 py-2">Q{d.subtotal.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm">Método: <strong>{selectedVentaFull.tipo_pago}</strong></div>
+                  <div className="text-lg font-bold">Total: Q{selectedVentaFull.total_venta?.toFixed(2) || '0.00'}</div>
+                </div>
+                <div className="flex gap-2 justify-end mt-4">
+                  <button onClick={() => setConfirmDeleteVenta(selectedVentaFull.id_venta)} className="h-10 rounded-lg bg-rose-600 px-4 text-white">Eliminar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Confirm Delete modal */}
+          {confirmDeleteVenta && (
+            <div className="fixed inset-0 z-[71] flex items-center justify-center bg-black/40">
+              <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md border">
+                <div className="text-lg font-bold mb-2">Eliminar Venta</div>
+                <div className="mb-4">¿Seguro que deseas eliminar la venta #{confirmDeleteVenta}? Esta acción sólo se permite si la venta está en estado pendiente.</div>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setConfirmDeleteVenta(null)} className="h-10 rounded-lg border px-4">Cancelar</button>
+                  <button onClick={async () => { await ventasService.deleteVenta(confirmDeleteVenta); setConfirmDeleteVenta(null); await loadVentas(); message.success('Venta eliminada'); }} className="h-10 rounded-lg bg-rose-600 px-4 text-white">Eliminar</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="text-gray-500 text-sm mt-4 flex items-center justify-between">
             <div className="flex items-center gap-4">

@@ -183,11 +183,27 @@ export class VentasService {
     // Obtener detalles
     const { data: detalles, error: detallesError } = await supabase
       .from('detalle_venta')
-      .select('*')
+      .select(`
+        *,
+        producto:producto(
+          nombre_producto
+        ),
+        variante:producto_variante(
+          nombre_variante
+        )
+      `)
       .eq('id_venta', id);
 
     if (detallesError) {
       throw new Error(`Error al obtener detalles de venta: ${detallesError.message}`);
+    }
+    // Normalizar product name para frontend (producto.nombre)
+    if (detalles && detalles.length) {
+      detalles.forEach((d: any) => {
+        if (d.producto && d.producto.nombre_producto && !d.producto.nombre) {
+          d.producto.nombre = d.producto.nombre_producto;
+        }
+      });
     }
 
     // Obtener cliente si existe
@@ -259,7 +275,12 @@ export class VentasService {
    * - fn_acumular_puntos_venta: Se ejecuta automáticamente por trigger al crear la venta confirmada
    */
   async createVenta(dto: CreateVentaDTO, idCajero: number): Promise<VentaCompleta> {
-    await cajaService.requireCajaAbierta(idCajero);
+    console.log('🔍 Creando venta con acumula_puntos:', dto.acumula_puntos);
+    
+    // Para ventas tipo 'Canje' o 'Cupon', no requerimos que la caja esté abierta ya que no afecta caja
+    if (dto.tipo_pago !== 'Canje' && dto.tipo_pago !== 'Cupon') {
+      await cajaService.requireCajaAbierta(idCajero);
+    }
 
     // 1. Crear venta principal directamente en estado 'confirmada'
     const { data: venta, error: ventaError } = await supabase
@@ -269,12 +290,15 @@ export class VentasService {
         tipo_pago: dto.tipo_pago,
         estado: 'confirmada', // Crear directamente confirmada
         id_cajero: idCajero,
+        acumula_puntos: dto.acumula_puntos ?? true,
         notas: dto.notas,
       })
       .select()
       .single();
 
     if (ventaError) throw new Error(`Error al crear venta: ${ventaError.message}`);
+
+    console.log('✅ Venta creada con ID:', venta.id_venta, 'acumula_puntos:', venta.acumula_puntos);
 
     // 2. Crear detalles de venta (triggers calculan precio_unitario, costo_unitario y totales)
     const detallesConVenta = dto.detalles.map((detalle) => ({
@@ -285,7 +309,8 @@ export class VentasService {
       precio_unitario: detalle.precio_unitario,
       costo_unitario: 0, // Se calcula automáticamente por trigger fn_calcular_precio_costo_venta
       descuento: detalle.descuento || 0,
-      es_canje_puntos: detalle.es_canje_puntos || false,
+      // Si la venta es tipo 'Canje' o el unitario es 0, marcar el detalle como canje
+      es_canje_puntos: detalle.es_canje_puntos ?? (dto.tipo_pago === 'Canje' || detalle.precio_unitario === 0),
       puntos_canjeados: detalle.puntos_canjeados || 0,
     }));
 
@@ -304,29 +329,6 @@ export class VentasService {
     // - fn_descontar_inventario_venta (trigger en PostgreSQL)
     // - fn_acumular_puntos_venta (trigger automático)
 
-    try {
-      // Forzar descuento de inventario para asegurar que se ejecute siempre
-      console.log(`Ejecutando descuento de inventario para venta ${venta.id_venta}...`);
-      const { error: rpcError } = await supabase.rpc('fn_descontar_inventario_venta', {
-        p_id_venta: venta.id_venta,
-        p_id_perfil: idCajero,
-      });
-
-      if (rpcError) {
-        console.error('Error ejecutando fn_descontar_inventario_venta:', rpcError.message);
-        console.error('Detalles del error:', {
-          message: rpcError.message,
-          details: rpcError.details,
-          hint: rpcError.hint,
-          code: rpcError.code
-        });
-      } else {
-        console.log(`Descuento de inventario completado exitosamente para venta ${venta.id_venta}`);
-      }
-    } catch (fallbackError) {
-      console.warn('Error en el proceso de descuento de inventario:', fallbackError);
-    }
-
     // 4. Manejar canje de puntos si existe
     if (dto.puntos_usados && dto.puntos_usados > 0 && dto.id_cliente) {
       const { error: canjeError } = await supabase.rpc('fn_canjear_puntos', {
@@ -341,7 +343,24 @@ export class VentasService {
       }
     }
 
-    // 5. Retornar venta completa
+    // 5. Si es transferencia, actualizar el depósito bancario con referencia y banco
+    if (dto.tipo_pago === 'Transferencia' && (dto.numero_referencia || dto.nombre_banco)) {
+      const { error: updateDepositoError } = await supabase
+        .from('deposito_banco')
+        .update({
+          numero_referencia: dto.numero_referencia || null,
+          nombre_banco: dto.nombre_banco || null
+        })
+        .eq('descripcion', `Pago por venta #${venta.id_venta}`)
+        .eq('tipo_pago', 'Transferencia');
+
+      if (updateDepositoError) {
+        console.error(`Error al actualizar depósito bancario: ${updateDepositoError.message}`);
+        // No lanzar error, solo loggear
+      }
+    }
+
+    // 6. Retornar venta completa
     const ventaCompleta = await this.getVentaCompleta(venta.id_venta);
     if (!ventaCompleta) {
       throw new Error('Error al obtener venta creada');
@@ -476,6 +495,48 @@ export class VentasService {
     });
 
     return { efectivo, transferencia, tarjeta, total, count };
+  }
+
+  /**
+   * Obtener transferencias de la sesión (ventas con tipo_pago = 'Transferencia')
+   */
+  async getTransferenciasSesion(fechaInicio: string): Promise<Venta[]> {
+    // Primero obtener las ventas con transferencia
+    const { data: ventas, error: ventasError } = await supabase
+      .from('venta')
+      .select(`
+        *,
+        cliente:cliente(nombre, telefono)
+      `)
+      .eq('estado', 'confirmada')
+      .eq('tipo_pago', 'Transferencia')
+      .gte('fecha_venta', fechaInicio)
+      .order('fecha_venta', { ascending: false });
+
+    if (ventasError) throw new Error(`Error al obtener transferencias de sesión: ${ventasError.message}`);
+
+    // Para cada venta, buscar el depósito correspondiente
+    const transferenciasConDepositos = await Promise.all(
+      (ventas || []).map(async (venta) => {
+        const { data: depositos, error: depositosError } = await supabase
+          .from('deposito_banco')
+          .select('numero_referencia, nombre_banco, nombre_cliente')
+          .eq('descripcion', `Pago por venta #${venta.id_venta}`)
+          .eq('tipo_pago', 'Transferencia')
+          .limit(1);
+
+        if (depositosError) {
+          console.error('Error obteniendo depósito para venta:', venta.id_venta, depositosError);
+        }
+
+        return {
+          ...venta,
+          deposito_banco: depositos && depositos.length > 0 ? depositos[0] : null
+        };
+      })
+    );
+
+    return transferenciasConDepositos;
   }
 
   /**
@@ -706,6 +767,27 @@ export class VentasService {
       categoria: 'Producto',
       imagen_url: producto.imagen_url,
     }));
+  }
+
+  /**
+   * Actualizar estado de transferencia de una venta
+   */
+  async updateEstadoTransferencia(idVenta: number, estado: 'esperando' | 'recibido'): Promise<void> {
+    try {
+      // Actualizar el estado de la transferencia
+      const { error } = await supabase
+        .from('venta')
+        .update({ estado_transferencia: estado })
+        .eq('id_venta', idVenta)
+        .eq('tipo_pago', 'Transferencia');
+
+      if (error) {
+        throw new Error(`Error al actualizar estado de transferencia: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error en updateEstadoTransferencia:', error);
+      throw error;
+    }
   }
 }
 

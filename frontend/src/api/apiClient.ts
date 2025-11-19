@@ -7,7 +7,7 @@ import axios from 'axios';
 import { localStore, cookieStore } from '../utils/storage';
 
 // URL del backend
-const API_URL = (import.meta.env.VITE_API_URL || '/api').trim();
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3002/api').trim();
 
 // Solo log en desarrollo
 if (import.meta.env.DEV) {

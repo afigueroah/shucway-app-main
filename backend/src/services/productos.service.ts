@@ -22,7 +22,6 @@ export class ProductosService {
     const { data, error } = await supabase
       .from('categoria_producto')
       .select('*')
-      .eq('estado', 'activo')
       .order('nombre_categoria');
 
     if (error) throw new Error(`Error al obtener categorías: ${error.message}`);
@@ -44,16 +43,51 @@ export class ProductosService {
 
   async createCategoria(
     nombre: string,
-    descripcion?: string
+    descripcion?: string,
+    estado: 'activo' | 'desactivado' = 'activo'
   ): Promise<CategoriaProducto> {
     const { data, error } = await supabase
       .from('categoria_producto')
-      .insert({ nombre_categoria: nombre, descripcion })
+      .insert({ nombre_categoria: nombre, descripcion, estado })
       .select()
       .single();
 
     if (error) throw new Error(`Error al crear categoría: ${error.message}`);
     return data;
+  }
+
+  async updateCategoria(
+    id: number,
+    nombre: string,
+    descripcion?: string,
+    estado?: 'activo' | 'desactivado'
+  ): Promise<CategoriaProducto> {
+    const updateData: { nombre_categoria: string; descripcion?: string; estado?: 'activo' | 'desactivado' } = {
+      nombre_categoria: nombre,
+      descripcion
+    };
+    if (estado !== undefined) {
+      updateData.estado = estado;
+    }
+
+    const { data, error } = await supabase
+      .from('categoria_producto')
+      .update(updateData)
+      .eq('id_categoria', id)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Error al actualizar categoría: ${error.message}`);
+    return data;
+  }
+
+  async deleteCategoria(id: number): Promise<void> {
+    const { error } = await supabase
+      .from('categoria_producto')
+      .delete()
+      .eq('id_categoria', id);
+
+    if (error) throw new Error(`Error al eliminar categoría: ${error.message}`);
   }
 
   // ================== PRODUCTOS ==================

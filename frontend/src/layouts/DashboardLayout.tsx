@@ -6,6 +6,7 @@ import avatarImg from "../assets/imgs/login.png";
 import { CgLogOut } from "react-icons/cg";
 import { MdHome, MdInventory, MdSettings, MdOutlineAssessment, MdAdminPanelSettings, MdShoppingCart, MdLockOpen, MdBackup, MdError, MdWarning, MdCancel, MdLock, MdPerson, MdHelp } from "react-icons/md";
 import { FiBell } from "react-icons/fi";
+import { PiTrashBold } from "react-icons/pi";
 import { handleLogout } from "../api/handleLogout";
 import { useNavigate, useLocation } from "react-router-dom";
 import { localStore } from "../utils/storage";
@@ -65,7 +66,7 @@ const ICON_HEX: Record<string, string> = {
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   // ... existing code ...
-  const { alerts: localAlerts } = useAlerts();
+  const { alerts: localAlerts, clearAlerts } = useAlerts();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -150,7 +151,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const getInitials = (name?: string | null) => {
     if (!name) return null;
-    const parts = name.split(/\s+/).filter(Boolean);
+    const parts = name.split(' ').filter(Boolean);
     if (parts.length === 0) return null;
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -245,7 +246,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       }
     };
     loadAlerts();
-  }, [handleAlertNavigation]);
+  }, [handleAlertNavigation, location.pathname]);
 
   // 🔔 Activar monitoreo automático de stock
   useStockMonitoring(true);
@@ -263,6 +264,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { name: 'Mantenimiento', route: '/configuracion/mantenimiento', section: 'Ajustes' },
     { name: 'Consultas SQL', route: '/configuracion/consultas-sql', section: 'Ajustes' },
     { name: 'Backup', route: '/configuracion/backup', section: 'Ajustes' },
+    { name: 'Reinicio de datos', route: '/configuracion/reinicio-datos', section: 'Ajustes' },
     { name: 'Administración', route: '/administracion', section: 'General' },
     { name: 'Gestionar Roles', route: '/administracion/roles', section: 'General' },
     { name: 'Ventas', route: '/ventas', section: 'General' },
@@ -601,11 +603,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="flex items-center justify-center w-full mt-1 caja-quick-widget">
           {collapsed ? (
             // Vista colapsada: solo icono
-            <button 
-              onClick={cajaOpen ? () => setShowConfirm(true) : openCaja}
+                        <button 
+              onClick={cajaOpen ? () => navigate('/ventas/cierre-caja') : openCaja}
               disabled={cajaLoading}
               className={`w-12 h-12 rounded-lg ${cajaOpen ? 'bg-yellow-400 hover:bg-yellow-500' : 'bg-green-500 hover:bg-green-600'} flex items-center justify-center shadow-md transition-colors ${cajaLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-              title={cajaOpen ? 'Cerrar Caja' : 'Abrir Caja'}
+              title={cajaOpen ? 'Ver Caja' : 'Abrir Caja'}
             >
               <MdLockOpen size={24} className={cajaOpen ? 'text-gray-900' : 'text-white'} />
             </button>
@@ -641,9 +643,9 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                     Abrir Caja
                   </button>
                 ) : (
-                  <button onClick={() => setShowConfirm(true)} disabled={cajaLoading} className={`w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 px-3 py-2 rounded-full font-normal flex items-center justify-center gap-2 text-sm ${cajaLoading ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                  <button onClick={() => navigate('/ventas/cierre-caja')} disabled={cajaLoading} className={`w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 px-3 py-2 rounded-full font-normal flex items-center justify-center gap-2 text-sm ${cajaLoading ? 'opacity-70 cursor-not-allowed' : ''}`}>
                     <MdLockOpen size={16} />
-                    Cerrar Caja
+                    Ver Caja
                   </button>
                 )}
               </div>
@@ -656,8 +658,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowConfirm(false)} />
             <div className="relative bg-white rounded-lg shadow-lg p-10 w-[32rem] max-w-2xl">
-              <h3 className="text-xl font-semibold mb-4 text-center">Confirmar cierre</h3>
-              <p className="text-lg text-gray-700 mb-8 leading-relaxed text-center">¿Estás seguro de que deseas cerrar la caja?<br />Se registrará el cierre y podrá revisarse en el módulo de ventas.</p>
+              <h3 className="text-xl font-semibold mb-4 text-center">Ver caja</h3>
+              <p className="text-lg text-gray-700 mb-8 leading-relaxed text-center">Vas a ver el arqueo de caja.<br />Podrás revisar las ventas y el estado actual de la caja.</p>
               <div className="flex gap-4 justify-end">
                 <button onClick={() => setShowConfirm(false)} disabled={cajaLoading} className={`px-6 py-3 rounded-md bg-gray-100 hover:bg-gray-200 font-bold text-xl flex items-center gap-2 ${cajaLoading ? 'opacity-70 cursor-not-allowed' : ''}`}>
                   <MdCancel size={24} />
@@ -665,7 +667,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                 </button>
                 <button onClick={cerrarCaja} disabled={cajaLoading} className={`px-6 py-3 rounded-md bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold text-xl flex items-center gap-2 ${cajaLoading ? 'opacity-70 cursor-not-allowed' : ''}`}>
                   <MdLock size={24} />
-                  Cerrar caja
+                  Ver caja
                 </button>
               </div>
             </div>
@@ -914,24 +916,38 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                       transition={{ duration: 0.2 }}
                       className="absolute right-0 mt-2 w-80 bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border-l-4 border-green-600 py-2 z-50 max-h-80 overflow-auto"
                     >
+                      {/* Botón para limpiar notificaciones - arriba */}
+                      <div className="px-4 py-2 border-b border-gray-200">
+                        <button
+                          onClick={() => {
+                            setNotifications([]);
+                            setAlerts([]);
+                            clearAlerts(); // Limpiar también las alertas del contexto
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <PiTrashBold size={16} />
+                          Limpiar notificaciones
+                        </button>
+                      </div>
                       {(() => {
                         const allNotifications = [...notifications, ...alerts, ...localAlerts];
                         return allNotifications.length > 0 ? (
                           allNotifications.map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => { item.action(); setAlertsOpen(false); }}
-                              className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-2xl bg-white shadow-sm border border-gray-200 flex items-start gap-3 transition-colors mb-2"
-                            >
-                              <div className="flex-shrink-0 mt-1 text-gray-600">
-                                {item.icon}
-                              </div>
-                              <div className="flex-1">
-                                <span className="text-xs text-gray-500 uppercase font-medium">{item.module}</span>
-                                <span className="text-sm text-gray-700 block">{item.message}</span>
-                              </div>
-                            </button>
-                          ))
+                              <button
+                                key={item.id}
+                                onClick={() => { item.action(); setAlertsOpen(false); }}
+                                className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-2xl bg-white shadow-sm border border-gray-200 flex items-start gap-3 transition-colors mb-2"
+                              >
+                                <div className="flex-shrink-0 mt-1 text-gray-600">
+                                  {item.icon}
+                                </div>
+                                <div className="flex-1">
+                                  <span className="text-xs text-gray-500 uppercase font-medium">{item.module}</span>
+                                  <span className="text-sm text-gray-700 block">{item.message}</span>
+                                </div>
+                              </button>
+                            ))
                         ) : (
                           <div className="px-4 py-3 text-sm text-gray-500">No hay notificaciones</div>
                         );

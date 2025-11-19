@@ -2,10 +2,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaMoneyBillWave, FaMoneyCheckAlt, FaBoxOpen } from "react-icons/fa";
-import { MdPointOfSale } from "react-icons/md";
+import { FaMoneyBillWave, FaMoneyCheckAlt, FaBoxOpen, FaUser, FaHashtag, FaUniversity, FaCheck, FaClock, FaTimes, FaFilePdf } from "react-icons/fa";
+import { MdPointOfSale, MdPrint } from "react-icons/md";
 import { cajaService, type CajaSesion } from "../../../../api/cajaService";
-import { ventasService } from "../../../../api/ventasService";
+import { ventasService, type Venta } from "../../../../api/ventasService";
+import { useAuth } from "../../../../hooks/useAuth";
+import html2pdf from 'html2pdf.js';
 
 /* ================= Paleta ================= */
 const primary = "#00B074";
@@ -53,14 +55,14 @@ function SalesCard({
         <FaBoxOpen size={20} className="text-gray-800" />
       </div>
       <h4 className="text-sm font-semibold text-gray-700 tracking-wide">
-        VENTAS DEL D??A
+        VENTAS DEL DÍA
       </h4>
       <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-6 pt-7">
         <div className="text-gray-500">Total de ventas:</div>
         <div className="text-right font-semibold tabular-nums text-gray-800">
           {currency(total)}
         </div>
-        <div className="text-gray-500">N??mero de ventas:</div>
+        <div className="text-gray-500">Número de ventas:</div>
         <div className="text-right font-semibold tabular-nums text-gray-800">
           {count}
         </div>
@@ -87,7 +89,7 @@ function PaymentsCard({
         <MdPointOfSale size={22} className="text-emerald-900" />
       </div>
       <h4 className="text-sm font-semibold text-gray-700 tracking-wide">
-        PAGOS DEL D??A
+        PAGOS DEL DÍA
       </h4>
       <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-6 pt-7">
         <div className="text-gray-500">Efectivo contado</div>
@@ -103,11 +105,12 @@ function PaymentsCard({
   );
 }
 
-/* =============================== P??gina =============================== */
+/* =============================== Página ============================== */
 const CierreCaja: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const formRef = useRef<HTMLDivElement | null>(null);
+  const { user } = useAuth();
 
   const [sesionCaja, setSesionCaja] = useState<CajaSesion | null>(null);
 
@@ -120,6 +123,14 @@ const CierreCaja: React.FC = () => {
   const [cerrando, setCerrando] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [modalOk, setModalOk] = useState<string | null>(null);
+  const [showAutoCloseModal, setShowAutoCloseModal] = useState(false);
+
+  const [transferencias, setTransferencias] = useState<unknown[]>([]);
+  const [loadingTransferencias, setLoadingTransferencias] = useState(false);
+  const [previousDayTotales, setPreviousDayTotales] = useState({ efectivo: 0, transferencia: 0, tarjeta: 0, total: 0, count: 0 });
+  const [previousDayTransferencias, setPreviousDayTransferencias] = useState<Venta[]>([]);
+  const [loadingPreviousDay, setLoadingPreviousDay] = useState(false);
+  const [previousDayFecha, setPreviousDayFecha] = useState<string>('');
 
   useEffect(() => {
     const state = location.state as { requireOpenCaja?: boolean; reason?: string } | undefined;
@@ -140,8 +151,7 @@ const CierreCaja: React.FC = () => {
     navigate(location.pathname, { replace: true, state: undefined });
   }, [location, navigate]);
 
-  const cajero =
-    sesionCaja?.id_cajero_apertura != null ? `Cajero #${sesionCaja.id_cajero_apertura}` : "—";
+  const cajero = user?.name || "—";
   const fechaAperturaISO = sesionCaja?.fecha_apertura ?? null;
   const fechaApertura = fechaAperturaISO
     ? new Intl.DateTimeFormat("es-GT", {
@@ -201,45 +211,6 @@ const CierreCaja: React.FC = () => {
   const [showTfDrawer, setShowTfDrawer] = useState<boolean>(false);
   const [tfRows, setTfRows] = useState<TfRows>(() => makeInitialTfRows());
 
-  const bankTotals = useMemo<Record<string, number>>(() => {
-    const totals: Record<string, number> = {};
-    BANKS.forEach((b) => {
-      totals[b.id] = (tfRows[b.id] || []).reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
-    });
-    return totals;
-  }, [tfRows]);
-
-  const totalTf = useMemo(
-    () => BANKS.reduce((acc, b) => acc + (bankTotals[b.id] || 0), 0),
-    [bankTotals]
-  );
-
-  const addTfRow = (bankId: string) =>
-    setTfRows((prev) => ({ ...prev, [bankId]: [...(prev[bankId] || []), { ref: "", amount: 0 }] }));
-
-  const removeTfRow = (bankId: string, idx: number) =>
-    setTfRows((prev) => {
-      const arr = [...(prev[bankId] || [])];
-      if (arr.length > 1) arr.splice(idx, 1);
-      return { ...prev, [bankId]: arr };
-    });
-
-  const updateTfRow = (bankId: string, idx: number, field: "ref" | "amount", value: string) =>
-    setTfRows((prev) => {
-      const arr = [...(prev[bankId] || [])];
-      const row = { ...arr[idx] };
-      if (field === "ref") row.ref = value;
-      if (field === "amount") row.amount = Math.max(0, Number(value) || 0);
-      arr[idx] = row;
-      return { ...prev, [bankId]: arr };
-    });
-
-  const limpiarTf = () => setTfRows(makeInitialTfRows());
-  const aplicarTf = () => {
-    setTransferVerificada(totalTf);
-    setShowTfDrawer(false);
-  };
-
   const resetFormulario = useCallback(() => {
     setEfectivoContado(0);
     setTransferVerificada(0);
@@ -293,6 +264,54 @@ const CierreCaja: React.FC = () => {
     }
   }, []);
 
+  const loadPreviousDayData = useCallback(async () => {
+    setLoadingPreviousDay(true);
+    try {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      setPreviousDayFecha(yesterdayStr);
+      const fechaInicio = yesterdayStr + ' 00:00:00';
+      const fechaFin = yesterdayStr + ' 23:59:59';
+
+      // Cargar ventas del día anterior
+      const ventas = await ventasService.getVentas('confirmada', fechaInicio, fechaFin);
+      setPreviousDayVentas(ventas);
+
+      // Calcular totales
+      let efectivo = 0;
+      let transferencia = 0;
+      let tarjeta = 0;
+      let total = 0;
+      let count = 0;
+
+      ventas.forEach((venta: Venta) => {
+        total += venta.total_venta || 0;
+        count++;
+        if (venta.tipo_pago === 'Cash') {
+          efectivo += venta.total_venta || 0;
+        } else if (venta.tipo_pago === 'Transferencia') {
+          transferencia += venta.total_venta || 0;
+        } else if (venta.tipo_pago === 'Tarjeta') {
+          tarjeta += venta.total_venta || 0;
+        }
+      });
+
+      setPreviousDayTotales({ efectivo, transferencia, tarjeta, total, count });
+
+      // Cargar transferencias del día anterior (filtrar de ventas)
+      const transferencias = ventas.filter((venta: Venta) => venta.tipo_pago === 'Transferencia');
+      setPreviousDayTransferencias(transferencias);
+    } catch (error) {
+      console.error("Error cargando datos del día anterior:", error);
+      setPreviousDayTotales({ efectivo: 0, transferencia: 0, tarjeta: 0, total: 0, count: 0 });
+      setPreviousDayTransferencias([]);
+      setPreviousDayFecha('');
+    } finally {
+      setLoadingPreviousDay(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshEstado();
   }, [refreshEstado]);
@@ -307,8 +326,22 @@ const CierreCaja: React.FC = () => {
 
           // Calcular valores automáticamente
           setEfectivoContado(result.efectivo);
-          setTransferVerificada(result.transferencia);
+          setTransferVerificada(0); // Inicia en 0, se incrementa cuando se marcan como recibidas
           setTransferEsperada(result.transferencia); // Monto esperado de transferencias
+
+          // Cargar transferencias de la sesión
+          setLoadingTransferencias(true);
+          if (sesionCaja.fecha_apertura) {
+            const transferenciasData = await ventasService.getTransferenciasSesion(sesionCaja.fecha_apertura);
+            setTransferencias(transferenciasData);
+
+            // Calcular transferencias ya verificadas (marcadas como 'recibido')
+            const transferenciasYaVerificadas = transferenciasData.filter(t => t.estado_transferencia === 'recibido');
+            const totalYaVerificado = transferenciasYaVerificadas.reduce((sum, t) => sum + (t.total_venta || 0), 0);
+            setTransferVerificada(totalYaVerificado);
+          } else {
+            setTransferencias([]);
+          }
         } catch (error) {
           console.error("Error cargando ventas de sesión:", error);
           setVentasTotales(0);
@@ -316,6 +349,9 @@ const CierreCaja: React.FC = () => {
           setEfectivoContado(0);
           setTransferVerificada(0);
           setTransferEsperada(0);
+          setTransferencias([]);
+        } finally {
+          setLoadingTransferencias(false);
         }
       };
       void loadVentasSesion();
@@ -381,7 +417,8 @@ const CierreCaja: React.FC = () => {
       resetFormulario();
       setSesionCaja(null);
       setMustOpen(true);
-      setModalOk("Caja cerrada correctamente. Gracias!");
+      setShowAutoCloseModal(true); // Mostrar modal de auto-close
+      await loadPreviousDayData();
       await refreshEstado();
     } catch (error) {
       console.error("Error al cerrar la caja:", error);
@@ -390,6 +427,32 @@ const CierreCaja: React.FC = () => {
       setTimeout(() => setToast(null), 2200);
     } finally {
       setCerrando(false);
+    }
+  };
+
+  const handleUpdateEstadoTransferencia = async (idVenta: number, estado: 'esperando' | 'recibido') => {
+    try {
+      await ventasService.updateEstadoTransferencia(idVenta, { estado });
+
+      // Actualizar el estado local y recalcular transferencias verificadas
+      setTransferencias(prev => {
+        const updatedTransferencias = prev.map(t =>
+          t.id_venta === idVenta
+            ? { ...t, estado_transferencia: estado }
+            : t
+        );
+
+        // Recalcular transferencias verificadas usando el array actualizado
+        const transferenciasRecibidas = updatedTransferencias.filter(t => t.estado_transferencia === 'recibido');
+        const totalVerificado = transferenciasRecibidas.reduce((sum, t) => sum + (t.total_venta || 0), 0);
+        setTransferVerificada(totalVerificado);
+
+        return updatedTransferencias;
+      });
+
+    } catch (error) {
+      console.error('Error al actualizar estado de transferencia:', error);
+      throw error; // Para que el componente lo maneje
     }
   };
 
@@ -402,7 +465,7 @@ const CierreCaja: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-gray-800">Arqueo y Cierre Diario</h2>
               <p className="text-sm text-gray-500 mt-1">
-                Cerrando la sesi??n iniciada el: <b>{fechaApertura}</b> por <b>{cajero}</b>
+                Cerrando la sesión iniciada el: <b>{fechaApertura}</b> por <b>{cajero}</b>
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -441,10 +504,13 @@ const CierreCaja: React.FC = () => {
           <h2 className="text-lg font-bold text-gray-800 mb-4">REGISTRO DE CIERRE</h2>
 
           <div className="grid md:grid-cols-2 gap-4">
-            {/* Efectivo Contado + Billetes */}
+            {/* Efectivo Contado (con columna "esperado") */}
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Efectivo Contado</label>
-              <div className="grid grid-cols-[1fr_auto] gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-1">
+                <label className="block text-sm text-gray-600">Efectivo Contado</label>
+                <label className="block text-sm text-gray-600 text-right">(esperado)</label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
                   step="0.01"
@@ -454,15 +520,23 @@ const CierreCaja: React.FC = () => {
                   }
                   className="w-full border rounded-lg px-3 h-11"
                 />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={efectivoEsperadoCalc}
+                  readOnly
+                  className="w-full border rounded-lg px-3 h-11 bg-blue-50 text-blue-700"
+                />
+
                 <button
                   type="button"
                   title="Arqueo de caja (billetes)"
                   aria-label="Arqueo de caja (billetes)"
                   onClick={() => setShowArqueo(true)}
-                  className="h-11 px-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center gap-2"
+                  className="h-11 px-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center gap-2 col-span-2"
                 >
                   <FaMoneyBillWave size={18} />
-                  <span className="hidden sm:inline text-sm font-medium">Billetes</span>
+                  <span className="text-sm font-medium">Billetes</span>
                 </button>
               </div>
             </div>
@@ -567,7 +641,7 @@ const CierreCaja: React.FC = () => {
                 </thead>
                 <tbody>
                   <tr className="border-t">
-                    <td className="px-4 py-3 text-gray-700">Ventas Totales (Todos los m??todos)</td>
+                    <td className="px-4 py-3 text-gray-700">Ventas Totales (Todos los métodos)</td>
                     <td className="px-4 py-3 text-right font-semibold">{currency(ventasTotales)}</td>
                   </tr>
                   <tr className="border-t">
@@ -639,14 +713,9 @@ const CierreCaja: React.FC = () => {
         <TransferDrawer
           open={showTfDrawer}
           onClose={() => setShowTfDrawer(false)}
-          tfRows={tfRows}
-          addTfRow={addTfRow}
-          removeTfRow={removeTfRow}
-          updateTfRow={updateTfRow}
-          bankTotals={bankTotals}
-          totalTf={totalTf}
-          onClear={limpiarTf}
-          onApply={aplicarTf}
+          transferencias={transferencias}
+          loadingTransferencias={loadingTransferencias}
+          onUpdateEstado={handleUpdateEstadoTransferencia}
         />
 
         {/* ===== Modal de Reporte (optimizado PDF) ===== */}
@@ -666,12 +735,13 @@ const CierreCaja: React.FC = () => {
             trabajadores: { banco: "Banco de los Trabajadores", items: tfRows.trabajadores ?? [] },
             gyt: { banco: "Banco G&T", items: tfRows.gyt ?? [] },
           }}
+          transferencias={transferencias}
           cajero={cajero}
           fechaApertura={fechaApertura}
         />
       </div>
 
-      {/* ===== Modal Guardi??n: Apertura de Caja ===== */}
+      {/* ===== Modal Guardián: Apertura de Caja ===== */}
       <AnimatePresence>
         {(mustOpen || guardChecking) && (
           <motion.div
@@ -749,6 +819,83 @@ const CierreCaja: React.FC = () => {
                   </div>
                 </>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== Modal de Auto-Close Caja ===== */}
+      <AnimatePresence>
+        {showAutoCloseModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" />
+            <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }} className="relative bg-white w-full max-w-4xl rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Caja Cerrada</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ventas Totales:</span>
+                  <span className="font-semibold">{currency(ventasTotales)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Efectivo Contado:</span>
+                  <span className="font-semibold">{currency(efectivoContado)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Transferencias Verificadas:</span>
+                  <span className="font-semibold">{currency(transferVerificada)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Monto Inicial:</span>
+                  <span className="font-semibold">{currency(montoInicial)}</span>
+                </div>
+                <div className="border-t pt-2 flex justify-between font-bold text-gray-800">
+                  <span>Efectivo Esperado:</span>
+                  <span>{currency(efectivoEsperadoCalc)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Diferencia:</span>
+                  <span className={`font-semibold ${diferencia === 0 ? 'text-green-600' : 'text-amber-600'}`}>
+                    {currency(diferencia)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Reporte del día anterior */}
+              <div className="mt-6 border-t pt-4">
+                <h4 className="text-lg font-bold text-gray-800 mb-4">Reporte del Día Anterior</h4>
+                {loadingPreviousDay ? (
+                  <div className="flex justify-center py-8">
+                    <svg className="animate-spin w-6 h-6 text-gray-600" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  </div>
+                ) : (
+                  <PrintableSheet
+                    titulo="Reporte del Día Anterior"
+                    ventasTotales={previousDayTotales.total}
+                    transferTotal={previousDayTotales.transferencia}
+                    montoInicial={0} // No aplica para día anterior
+                    esperado={previousDayTotales.total} // Simplificar
+                    contado={previousDayTotales.efectivo}
+                    diferencia={0} // No aplica
+                    detalleTransferencias={[]} // Simplificar
+                    transferencias={previousDayTransferencias}
+                    cajero={cajero}
+                    fechaApertura={previousDayFecha ? `${previousDayFecha} 00:00:00` : ''}
+                    fechaCierre={previousDayFecha ? `${previousDayFecha} 23:59:59` : ''}
+                  />
+                )}
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button 
+                  onClick={() => setShowAutoCloseModal(false)} 
+                  className="px-6 h-11 rounded-md text-white font-semibold"
+                  style={{ background: primary }}
+                >
+                  Enterado
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -914,26 +1061,29 @@ function ArqueoDrawer({
 function TransferDrawer({
   open,
   onClose,
-  tfRows,
-  addTfRow,
-  removeTfRow,
-  updateTfRow,
-  bankTotals,
-  totalTf,
-  onClear,
-  onApply,
+  transferencias,
+  loadingTransferencias,
+  onUpdateEstado,
 }: {
   open: boolean;
   onClose: () => void;
-  tfRows: Record<string, { ref?: string; amount: number }[]>;
-  addTfRow: (bankId: string) => void;
-  removeTfRow: (bankId: string, idx: number) => void;
-  updateTfRow: (bankId: string, idx: number, field: "ref" | "amount", value: string) => void;
-  bankTotals: Record<string, number>;
-  totalTf: number;
-  onClear: () => void;
-  onApply: () => void;
+  transferencias: unknown[]; // Ventas con tipo_pago = 'Transferencia'
+  loadingTransferencias: boolean;
+  onUpdateEstado: (idVenta: number, estado: 'esperando' | 'recibido') => Promise<void>;
 }) {
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const handleUpdateEstado = async (idVenta: number, estado: 'esperando' | 'recibido') => {
+    setUpdatingId(idVenta);
+    try {
+      await onUpdateEstado(idVenta, estado);
+    } catch (error) {
+      console.error('Error al actualizar estado de transferencia:', error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   return (
     <AnimatePresence>
       {open && (
@@ -953,104 +1103,142 @@ function TransferDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed right-0 top-0 h-full w-full max-w-[620px] bg-white shadow-2xl z-50 flex flex-col"
+            className="fixed right-0 top-0 h-full w-full max-w-[700px] bg-white shadow-2xl z-50 flex flex-col"
           >
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">Transferencias verificadas</h3>
-                <p className="text-xs text-gray-500">Agrega las transferencias por banco y sus montos (Q).</p>
+                <h3 className="text-lg font-semibold text-gray-800">Transferencias de Ventas</h3>
+                <p className="text-xs text-gray-500">Verifica el estado de las transferencias realizadas en ventas.</p>
               </div>
               <button onClick={onClose} className="px-3 py-1 rounded-md border bg-gray-50 hover:bg-gray-100 text-sm">
-                ???
+                ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-5 overflow-auto">
-              {BANKS.map((b) => {
-                const rows = tfRows[b.id] || [];
-                const subtotal = bankTotals[b.id] || 0;
-                const count = rows.filter((r) => (Number(r.amount) || 0) > 0).length;
-
-                return (
-                  <div key={b.id} className="rounded-xl border border-gray-200 shadow-sm">
-                    <div className="px-4 py-3 border-b flex items-center justify-between">
-                      <h4 className="font-semibold text-gray-800">
-                        {b.nombre}
-                        <span className="ml-2 text-xs text-gray-500">({count} trx)</span>
-                      </h4>
-                      <div className="text-sm font-bold">{currency(subtotal)}</div>
-                    </div>
-
-                    <div className="px-4 py-3">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-gray-600">
-                          <tr>
-                            <th className="px-2 py-2 w-10 text-left">#</th>
-                            <th className="px-2 py-2 text-left">Ref.</th>
-                            <th className="px-2 py-2 text-right">Monto (Q)</th>
-                            <th className="px-2 py-2 w-16"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {rows.map((r, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="px-2 py-2">{idx + 1}</td>
-                              <td className="px-2 py-2">
-                                <input
-                                  type="text"
-                                  value={r.ref || ""}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    updateTfRow(b.id, idx, "ref", e.target.value)
-                                  }
-                                  className="w-full h-9 border border-gray-300 rounded-md px-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300"
-                                  placeholder="Opcional"
-                                />
-                              </td>
-                              <td className="px-2 py-2 text-right">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  value={r.amount}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    updateTfRow(b.id, idx, "amount", e.target.value)
-                                  }
-                                  className="w-36 h-9 border border-gray-300 rounded-md px-2 text-right bg-white focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300"
-                                />
-                              </td>
-                              <td className="px-2 py-2 text-right">
-                                <button onClick={() => removeTfRow(b.id, idx)} className="px-2 py-1 rounded-md border hover:bg-gray-100 text-xs" title="Eliminar fila">
-                                  Eliminar
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-
-                      <div className="mt-3 flex items-center justify-between">
-                        <button onClick={() => addTfRow(b.id)} className="px-3 py-2 rounded-md border hover:bg-gray-100 text-sm">
-                          + Agregar transferencia
-                        </button>
-                        <div className="text-sm">
-                          Subtotal: <b>{currency(subtotal)}</b>
+            <div className="p-5 overflow-auto flex-1">
+              {loadingTransferencias ? (
+                <div className="flex items-center justify-center py-10">
+                  <svg className="animate-spin w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  <span className="ml-2 text-gray-500">Cargando transferencias...</span>
+                </div>
+              ) : transferencias.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  No hay transferencias en esta sesión.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {transferencias.map((venta) => (
+                    <div key={venta.id_venta} className="rounded-xl border border-gray-200 shadow-sm p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-semibold text-gray-800">Venta #{venta.id_venta}</div>
+                          <div className="text-sm text-gray-500">
+                            {new Date(venta.fecha_venta).toLocaleString('es-GT', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-lg">{currency(venta.total_venta)}</div>
+                          <div className={`text-sm px-2 py-1 rounded-full ${
+                            venta.estado_transferencia === 'recibido'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {venta.estado_transferencia === 'recibido' ? 'Recibido' : 'Esperando'}
+                          </div>
                         </div>
                       </div>
+
+                      {/* Detalles adicionales con iconos */}
+                      <div className="grid grid-cols-1 gap-2 mb-3 text-sm">
+                        {venta.cliente && (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <FaUser className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium">Cliente:</span>
+                            <span>{venta.cliente.nombre || 'Sin nombre'}</span>
+                          </div>
+                        )}
+                        {venta.deposito_banco?.numero_referencia && (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <FaHashtag className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium">Referencia:</span>
+                            <span>{venta.deposito_banco.numero_referencia}</span>
+                          </div>
+                        )}
+                        {venta.deposito_banco?.nombre_banco && (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <FaUniversity className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium">Banco:</span>
+                            <span>{venta.deposito_banco.nombre_banco}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleUpdateEstado(venta.id_venta, 'recibido')}
+                          disabled={updatingId === venta.id_venta || venta.estado_transferencia === 'recibido'}
+                          className={`flex-1 h-9 rounded-md text-sm font-medium ${
+                            venta.estado_transferencia === 'recibido'
+                              ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                              : 'bg-green-500 text-white hover:bg-green-600'
+                          }`}
+                        >
+                          {updatingId === venta.id_venta ? (
+                            <svg className="animate-spin w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                            </svg>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2">
+                              <FaCheck className="w-4 h-4" />
+                              <span>RECIBIDO</span>
+                            </div>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleUpdateEstado(venta.id_venta, 'esperando')}
+                          disabled={updatingId === venta.id_venta || venta.estado_transferencia === 'esperando'}
+                          className={`flex-1 h-9 rounded-md text-sm font-medium ${
+                            venta.estado_transferencia === 'esperando'
+                              ? 'bg-amber-100 text-amber-700 cursor-not-allowed'
+                              : 'bg-amber-500 text-white hover:bg-amber-600'
+                          }`}
+                        >
+                          {updatingId === venta.id_venta ? (
+                            <svg className="animate-spin w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                            </svg>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2">
+                              <FaClock className="w-4 h-4" />
+                              <span>ESPERANDO</span>
+                            </div>
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-auto px-5 py-4 border-t bg-gray-50 flex items-center justify-between">
-              <button onClick={onClear} className="px-3 py-2 rounded-md border hover:bg-gray-100 text-sm">
-                Limpiar todo
-              </button>
-              <div className="flex gap-2 items-center">
-                <div className="text-sm mr-2">Total: <b>{currency(totalTf)}</b></div>
-                <button onClick={onClose} className="px-4 py-2 rounded-md border bg-white hover:bg-gray-100">Cancelar</button>
-                <button onClick={onApply} className="px-4 py-2 rounded-md text-white" style={{ background: primary }}>Usar este total</button>
+              <div className="text-sm">
+                Total transferencias: <b>{currency(transferencias.reduce((sum, v) => sum + (v.total_venta || 0), 0))}</b>
               </div>
+              <button onClick={onClose} className="px-4 py-2 rounded-md border bg-white hover:bg-gray-100">
+                Cerrar
+              </button>
             </div>
           </motion.aside>
         </>
@@ -1070,6 +1258,7 @@ function ReportModal({
   contado,
   diferencia,
   detalleTransferencias,
+  transferencias,
   cajero,
   fechaApertura,
   titulo = "REPORTE DE CIERRE DE CAJA",
@@ -1083,6 +1272,7 @@ function ReportModal({
   contado: number;
   diferencia: number;
   detalleTransferencias?: TfRowsFull;
+  transferencias: unknown[];
   cajero?: string;
   fechaApertura?: string;
   titulo?: string;
@@ -1099,6 +1289,101 @@ function ReportModal({
       }).format(new Date()),
     []
   );
+
+  const printCss = `
+            @page { size: A4; margin: 12mm; }
+
+            /* Ocultar el nodo imprimible en pantalla sin usar display:none */
+            @media screen {
+              #reporte-cierre {
+                position: fixed;
+                left: -99999px;
+                top: -99999px;
+                width: 0;
+                height: 0;
+                overflow: hidden;
+              }
+            }
+
+            @media print {
+              /* Mostrar únicamente el contenedor del reporte */
+              body * { visibility: visible; }
+              html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              table { page-break-inside: avoid; break-inside: avoid; }
+              .sheet { width: 210mm; min-height: 297mm; }
+            }
+          `;
+
+  const openPrintWindow = (title?: string) => {
+    try {
+      const node = document.getElementById('reporte-cierre');
+      if (!node) {
+        console.warn('No printable node found (#reporte-cierre)');
+        return;
+      }
+
+      if (title?.includes('PDF')) {
+        // Usar html2pdf para generar PDF sin abrir nueva ventana
+        // Clonar el node para hacerlo visible temporalmente
+        const clonedNode = node.cloneNode(true) as HTMLElement;
+        clonedNode.style.position = '';
+        clonedNode.style.left = '';
+        clonedNode.style.top = '';
+        clonedNode.style.width = '';
+        clonedNode.style.height = '';
+        clonedNode.style.overflow = '';
+        // Hacerlo visible temporalmente
+        clonedNode.style.position = 'absolute';
+        clonedNode.style.left = '-9999px';
+        clonedNode.style.top = '0';
+        clonedNode.style.width = '210mm';
+        clonedNode.style.minHeight = '297mm';
+        document.body.appendChild(clonedNode);
+
+        const opt = {
+          margin: 0.5,
+          filename: `cierre-caja-${new Date().toISOString().split('T')[0]}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(clonedNode).save().then(() => {
+          document.body.removeChild(clonedNode);
+        });
+        return;
+      }
+
+      // Para imprimir, abrir nueva ventana
+      const cssHref = '/src/index.css';
+      const docHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${title ?? 'Reporte'}</title><link rel="stylesheet" href="${cssHref}">
+      <style>
+        /* Base styles copied from app to preserve look */
+        body{font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color:#111827;}
+        ${printCss}
+      </style></head><body>${node.innerHTML}</body></html>`;
+
+      const w = window.open('', '_blank');
+      if (!w) {
+        alert('No se pudo abrir la ventana de impresión. Revisa bloqueadores de ventanas emergentes.');
+        return;
+      }
+
+      w.document.open();
+      w.document.write(docHtml);
+      w.document.close();
+      // Esperar a que cargue el contenido antes de imprimir
+      w.focus();
+      setTimeout(() => {
+        try {
+          w.print();
+        } catch (err) {
+          console.warn('Error al imprimir:', err);
+        }
+      }, 300);
+    } catch (err) {
+      console.error('openPrintWindow error', err);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -1126,6 +1411,7 @@ function ReportModal({
                     contado={contado}
                     diferencia={diferencia}
                     detalleTransferencias={detalleTransferencias}
+                    transferencias={transferencias}
                     cajero={cajero}
                     fechaApertura={fechaApertura}
                     fechaCierre={fechaCierre}
@@ -1134,10 +1420,16 @@ function ReportModal({
               </div>
 
               <div className="flex justify-end gap-3 border-t p-4 bg-white flex-shrink-0">
-                <button onClick={() => window.print()} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700">
-                  Exportar a PDF / Imprimir
+                <button onClick={() => openPrintWindow('Exportar PDF - SHUCAWY') } className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                  <FaFilePdf size={18} />
+                  Exportar a PDF
                 </button>
-                <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300">
+                <button onClick={() => openPrintWindow('Imprimir - SHUCAWY')} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2">
+                  <MdPrint size={18} />
+                  Imprimir
+                </button>
+                <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 flex items-center gap-2">
+                  <FaTimes size={18} />
                   Cerrar
                 </button>
               </div>
@@ -1155,6 +1447,7 @@ function ReportModal({
               contado={contado}
               diferencia={diferencia}
               detalleTransferencias={detalleTransferencias}
+              transferencias={transferencias}
               cajero={cajero}
               fechaApertura={fechaApertura}
               fechaCierre={fechaCierre}
@@ -1197,7 +1490,7 @@ function ReportModal({
       )}
     </AnimatePresence>
   );
-}
+};
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -1227,7 +1520,7 @@ function PrintableSheet({
   esperado,
   contado,
   diferencia,
-  detalleTransferencias,
+  transferencias,
   cajero,
   fechaApertura,
   fechaCierre,
@@ -1239,26 +1532,21 @@ function PrintableSheet({
   esperado: number;
   contado: number;
   diferencia: number;
-  detalleTransferencias?: TfRowsFull;
+  transferencias: unknown[];
   cajero?: string;
   fechaApertura?: string;
   fechaCierre: string;
 }) {
-  const hasTf = !!(detalleTransferencias && Object.keys(detalleTransferencias).length);
-
   return (
     <div className="sheet mx-auto bg-white rounded-xl border shadow-sm p-8">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-xs uppercase tracking-wider text-gray-500">Sucursal</div>
-          <div className="text-base font-bold text-gray-900">Mi Comercio, S.A.</div>
-          <div className="text-xs text-gray-500">NIT 1234567-8</div>
+          <div className="text-base font-bold text-gray-900">SHUCAWY</div>
         </div>
         <div className="text-right">
           <div className="text-[10px] uppercase text-gray-500">Fecha de cierre</div>
           <div className="text-sm font-bold">{fechaCierre}</div>
-          {cajero && <div className="mt-1 text-xs text-gray-600">Cajero: <b className="text-gray-800">{cajero}</b></div>}
         </div>
       </div>
 
@@ -1292,42 +1580,50 @@ function PrintableSheet({
       </div>
 
       {/* Transferencias por banco */}
-      {hasTf && (
+      {transferencias.length > 0 && (
         <div className="mt-6 rounded-lg border p-4">
           <SectionHeading>Transferencias verificadas por banco</SectionHeading>
-          {Object.entries(detalleTransferencias!).map(([bankId, { banco, items }]) => {
-            const subtotal = (items || []).reduce((a, it) => a + (Number(it.amount) || 0), 0);
-            const count = (items || []).filter((it) => (Number(it.amount) || 0) > 0).length;
+          {Object.entries(
+            transferencias
+              .filter(t => t.total_venta > 0 && t.estado_transferencia === 'recibido')
+              .reduce((acc, t) => {
+                const banco = t.deposito_banco?.banco || 'Sin banco';
+                if (!acc[banco]) acc[banco] = [];
+                acc[banco].push(t);
+                return acc;
+              }, {} as Record<string, unknown[]>)
+          ).map(([banco, transfers]) => {
+            const subtotal = transfers.reduce((sum, t) => sum + (t.total_venta || 0), 0);
             return (
-              <div key={bankId} className="mb-4 last:mb-0 break-inside-avoid">
+              <div key={banco} className="mb-4 last:mb-0 break-inside-avoid">
                 <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
                   <div>
-                    {banco || bankId} <span className="text-gray-500 font-normal">({count} trx)</span>
+                    {banco} <span className="text-gray-500 font-normal">({transfers.length} trx)</span>
                   </div>
                   <div className="tabular-nums">{currency(subtotal)}</div>
                 </div>
-                {!!items?.length && (
-                  <div className="mt-2 overflow-hidden rounded-md border">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50 text-gray-600">
-                        <tr>
-                          <th className="px-3 py-2 text-left">#</th>
-                          <th className="px-3 py-2 text-left">Referencia</th>
-                          <th className="px-3 py-2 text-right">Monto (Q)</th>
+                <div className="mt-2 overflow-hidden rounded-md border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-gray-600">
+                      <tr>
+                        <th className="px-3 py-2 text-left">#</th>
+                        <th className="px-3 py-2 text-left">Cliente</th>
+                        <th className="px-3 py-2 text-left">Referencia</th>
+                        <th className="px-3 py-2 text-right">Monto (Q)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {transfers.map((t: unknown, idx) => (
+                        <tr key={t.id_venta}>
+                          <td className="px-3 py-1">{idx + 1}</td>
+                          <td className="px-3 py-1">{t.cliente?.nombre || 'Sin cliente'}</td>
+                          <td className="px-3 py-1">{t.deposito_banco?.numero_referencia || '---'}</td>
+                          <td className="px-3 py-1 text-right tabular-nums">{currency(t.total_venta || 0)}</td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {items.map((it, idx) => (
-                          <tr key={idx}>
-                            <td className="px-3 py-1">{idx + 1}</td>
-                            <td className="px-3 py-1">{it.ref || "???"}</td>
-                            <td className="px-3 py-1 text-right tabular-nums">{currency(Number(it.amount) || 0)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             );
           })}
@@ -1335,21 +1631,16 @@ function PrintableSheet({
       )}
 
       {/* Firmas */}
-      <div className="mt-8 grid grid-cols-2 gap-8">
-        <div className="text-center">
-          <div className="h-12" />
-          <div className="border-t border-gray-400 pt-1 text-xs text-gray-600">Responsable de Caja</div>
-        </div>
-        <div className="text-center">
-          <div className="h-12" />
-          <div className="border-t border-gray-400 pt-1 text-xs text-gray-600">Supervisor</div>
-        </div>
+      <div className="mt-8 text-center">
+        <div className="h-12" />
+        <div className="border-t border-gray-400 pt-1 text-sm text-gray-800">{cajero || ""}</div>
+        <div className="text-xs text-gray-600">Responsable de Caja</div>
       </div>
 
       {/* Pie */}
       <div className="mt-6 text-[10px] text-gray-500 flex items-center justify-between">
         <div>Generado: {fechaCierre}</div>
-        <div>?? {new Date().getFullYear()} Mi Comercio, S.A.</div>
+        <div></div>
       </div>
     </div>
   );
