@@ -6,6 +6,32 @@ import { AuthRequest } from '../types/express.types';
 const router = Router();
 
 /**
+ * GET /auditoria/test-auth
+ * Endpoint de prueba para verificar autenticación
+ */
+router.get('/test-auth', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    console.log('✅ Test auth exitoso:', {
+      userId: req.user?.id,
+      userEmail: req.user?.email,
+      userRole: req.user?.role?.nombre_rol
+    });
+    return res.json({
+      success: true,
+      message: 'Autenticación exitosa',
+      user: {
+        id: req.user?.id,
+        email: req.user?.email,
+        role: req.user?.role?.nombre_rol
+      }
+    });
+  } catch (error) {
+    console.error('Error en test auth:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+/**
  * GET /auditoria/detalle/:id_auditoria
  * Carga los detalles de una auditoría (auditoria_detalle)
  * Respeta RLS del backend
@@ -13,12 +39,68 @@ const router = Router();
 router.get('/detalle/:id_auditoria', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { id_auditoria } = req.params;
+    const userId = req.user?.id;
+    const userRole = req.user?.role?.nombre_rol;
+
+    console.log('🔍 Cargando detalles de auditoría:', {
+      id_auditoria,
+      userId,
+      userRole,
+      userEmail: req.user?.email
+    });
 
     if (!id_auditoria || isNaN(Number(id_auditoria))) {
       return res.status(400).json({ error: 'ID de auditoría inválido' });
     }
 
     // Usar Supabase del backend (con permisos de servidor)
+    // Primero verificar que la auditoría existe
+    const { data: auditoriaExists, error: checkError } = await supabase
+      .from('auditoria_inventario')
+      .select('id_auditoria')
+      .eq('id_auditoria', Number(id_auditoria))
+      .single();
+
+    if (checkError || !auditoriaExists) {
+      console.error('❌ Auditoría no encontrada:', {
+        id_auditoria,
+        error: checkError?.message,
+        exists: !!auditoriaExists
+      });
+      return res.status(404).json({ error: 'Auditoría no encontrada' });
+    }
+
+    console.log('✅ Auditoría existe:', auditoriaExists);
+
+    // Verificar permisos del usuario para esta auditoría
+    // Por ahora, permitir acceso a todos los usuarios autenticados
+    console.log('🔍 Usuario autorizado para acceder a auditoría:', {
+      userId: req.user?.id,
+      userRole: req.user?.role?.nombre_rol,
+      auditoriaId: id_auditoria
+    });
+
+    // Primero intentar una consulta simple sin joins
+    const { data: simpleData, error: simpleError } = await supabase
+      .from('auditoria_detalle')
+      .select('id_detalle, id_insumo, stock_esperado, conteo_fisico')
+      .eq('id_auditoria', Number(id_auditoria))
+      .limit(5);
+
+    if (simpleError) {
+      console.error('❌ Error en consulta simple:', {
+        error: simpleError.message,
+        code: simpleError.code,
+        details: simpleError.details
+      });
+      return res.status(500).json({
+        error: 'Error en consulta simple',
+        details: simpleError.message
+      });
+    }
+
+    console.log('✅ Consulta simple exitosa, registros encontrados:', simpleData?.length || 0);
+
     const { data, error } = await supabase
       .from('auditoria_detalle')
       .select(`
@@ -43,9 +125,22 @@ router.get('/detalle/:id_auditoria', authenticateToken, async (req: AuthRequest,
       .order('id_insumo', { ascending: true });
 
     if (error) {
-      console.error('Error cargando auditoria_detalle:', error);
-      return res.status(500).json({ error: 'Error al cargar detalles de auditoría' });
+      console.error('❌ Error cargando auditoria_detalle:', {
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        id_auditoria,
+        userId
+      });
+      return res.status(500).json({ error: 'Error al cargar detalles de auditoría', details: error.message });
     }
+
+    console.log('✅ Detalles de auditoría cargados exitosamente:', {
+      id_auditoria,
+      registros: data?.length || 0,
+      userId
+    });
 
     return res.json(data || []);
   } catch (error) {

@@ -582,8 +582,11 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
   };
 
   const total = useMemo(
-    () => carrito.reduce((acc, it) => acc + getCartItemUnitPrice(it) * it.qty, 0),
-    [carrito]
+    () => {
+      const esDecimaCompra = clienteSeleccionado?.puntos_acumulados === 9;
+      return esDecimaCompra ? 0 : carrito.reduce((acc, it) => acc + getCartItemUnitPrice(it) * it.qty, 0);
+    },
+    [carrito, clienteSeleccionado?.puntos_acumulados]
   );
 
   /* ============================================================
@@ -1076,6 +1079,13 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
      ============================================================ */
   const irAPago = () => {
     if (!carrito.length) return addNotification({ type: 'warning', title: 'Carrito vacío', message: 'Agrega productos a la orden' });
+
+    // Si es décima compra (cliente tiene 9 puntos), ir directamente a confirmar
+    if (clienteSeleccionado?.puntos_acumulados === 9) {
+      confirmarPago();
+      return;
+    }
+
     setPagoError('');
     setCashInvalid(false);
     setTransfInvalid(false);
@@ -1195,17 +1205,20 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
     }
 
     if (metodo === 'efectivo') {
-      if (Number.isNaN(receivedNumber) || receivedNumber <= 0) {
-        setPagoError('Ingresa el dinero recibido.');
-        setCashInvalid(true);
-        setTransfInvalid(false);
-        return;
-      }
-      if (receivedNumber < total) {
-        setPagoError('El dinero recibido es menor al total.');
-        setCashInvalid(true);
-        setTransfInvalid(false);
-        return;
+      // Para décima compra (total = 0), no validar dinero recibido
+      if (total > 0) {
+        if (Number.isNaN(receivedNumber) || receivedNumber <= 0) {
+          setPagoError('Ingresa el dinero recibido.');
+          setCashInvalid(true);
+          setTransfInvalid(false);
+          return;
+        }
+        if (receivedNumber < total) {
+          setPagoError('El dinero recibido es menor al total.');
+          setCashInvalid(true);
+          setTransfInvalid(false);
+          return;
+        }
       }
     }
 
@@ -1217,6 +1230,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
 
       // Crear el payload para la venta
       console.log('🛒 Creando venta con puntosEnabled:', puntosEnabled);
+      const esDecimaCompra = clienteSeleccionado?.puntos_acumulados === 9;
       const ventaData: CreateVentaDTO = {
         id_cliente: clienteSeleccionado?.id_cliente,
         tipo_pago: metodo === 'efectivo' ? 'Cash' : metodo === 'transferencia' ? 'Transferencia' : metodo === 'cupon' ? 'Cupon' : 'Paggo',
@@ -1226,10 +1240,10 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
           id_producto: item.producto.id_producto,
           id_variante: item.id_variante,
           cantidad: item.qty,
-          precio_unitario: getCartItemUnitPrice(item),
+          precio_unitario: esDecimaCompra ? 0 : getCartItemUnitPrice(item), // Gratis si es décima compra
           descuento: 0, // Por ahora no hay descuentos
-          es_canje_puntos: false,
-          puntos_canjeados: 0,
+          es_canje_puntos: esDecimaCompra, // Marcar como canje si es décima compra
+          puntos_canjeados: esDecimaCompra ? 10 : 0, // Canjear 10 puntos
         })),
         // Agregar información de transferencia si es el método seleccionado
         ...(metodo === 'transferencia' && {
@@ -1697,8 +1711,9 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                   </div>
 
                   {clienteSeleccionado && clienteSeleccionado.puntos_acumulados === 9 && (
-                    <div className="mb-4 text-sm text-orange-600 font-medium bg-orange-50 border border-orange-200 rounded-lg p-3">
-                      ⚠️ ¡La próxima compra es gratis! (9 puntos acumulados)
+                    <div className="mb-4 text-sm text-orange-600 font-medium bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center gap-2">
+                      <Gift className="w-5 h-5" />
+                      ¡La próxima compra es gratis! (9 puntos acumulados)
                     </div>
                   )}
 
@@ -2064,7 +2079,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                   </button>
                   <button
                     onClick={() => setConfirmCanje(true)}
-                    disabled={!carrito.length || !puntosEnabled}
+                    disabled={!carrito.length || !puntosEnabled || clienteSeleccionado?.puntos_acumulados === 9}
                     className="h-12 rounded-lg bg-purple-600 text-white font-semibold text-base hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     <Gift size={18} />
@@ -2076,7 +2091,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                     className="h-12 rounded-lg bg-emerald-600 text-white font-semibold text-base hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     <CreditCard size={18} />
-                    Pagar ahora
+                    {clienteSeleccionado?.puntos_acumulados === 9 ? 'DECIMA COMPRA' : 'Pagar ahora'}
                   </button>
                 </div>
                 {/* Confirm canje modal */}

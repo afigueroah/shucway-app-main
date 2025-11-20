@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { FaMoneyBillWave, FaMoneyCheckAlt, FaBoxOpen, FaUser, FaHashtag, FaUniversity, FaCheck, FaClock, FaTimes, FaFilePdf } from "react-icons/fa";
 import { MdPointOfSale, MdPrint } from "react-icons/md";
 import { cajaService, type CajaSesion } from "../../../../api/cajaService";
-import { ventasService, type Venta } from "../../../../api/ventasService";
+import { ventasService, type Venta, type VentaTransferencia } from "../../../../api/ventasService";
 import { useAuth } from "../../../../hooks/useAuth";
 import html2pdf from 'html2pdf.js';
 
@@ -24,19 +24,9 @@ const toCents = (n: number | undefined | null) => Math.round((n ?? 0) * 100);
 const fromCents = (c: number | undefined | null) => (c ?? 0) / 100;
 
 /* ================= Tipos compartidos ================= */
-type TfItem = { ref?: string; amount: number };
-type TfRowsFull = Record<string, { banco?: string; items: TfItem[] }>;
 
 /* Denominaciones GTQ */
 const DENOMS = [100, 50, 20, 10, 5, 1, 0.5, 0.25] as const;
-
-/* Bancos */
-const BANKS = [
-  { id: "industrial", nombre: "Banco Industrial" },
-  { id: "banrural", nombre: "Banrural" },
-  { id: "trabajadores", nombre: "Banco de los Trabajadores" },
-  { id: "gyt", nombre: "Banco G&T" },
-] as const;
 
 /* ========== Tarjetas KPI ========== */
 function SalesCard({
@@ -125,10 +115,10 @@ const CierreCaja: React.FC = () => {
   const [modalOk, setModalOk] = useState<string | null>(null);
   const [showAutoCloseModal, setShowAutoCloseModal] = useState(false);
 
-  const [transferencias, setTransferencias] = useState<unknown[]>([]);
+  const [transferencias, setTransferencias] = useState<VentaTransferencia[]>([]);
   const [loadingTransferencias, setLoadingTransferencias] = useState(false);
   const [previousDayTotales, setPreviousDayTotales] = useState({ efectivo: 0, transferencia: 0, tarjeta: 0, total: 0, count: 0 });
-  const [previousDayTransferencias, setPreviousDayTransferencias] = useState<Venta[]>([]);
+  const [previousDayTransferencias, setPreviousDayTransferencias] = useState<VentaTransferencia[]>([]);
   const [loadingPreviousDay, setLoadingPreviousDay] = useState(false);
   const [previousDayFecha, setPreviousDayFecha] = useState<string>('');
 
@@ -151,7 +141,7 @@ const CierreCaja: React.FC = () => {
     navigate(location.pathname, { replace: true, state: undefined });
   }, [location, navigate]);
 
-  const cajero = user?.name || "—";
+  const cajero = user?.nombre || "—";
   const fechaAperturaISO = sesionCaja?.fecha_apertura ?? null;
   const fechaApertura = fechaAperturaISO
     ? new Intl.DateTimeFormat("es-GT", {
@@ -170,18 +160,9 @@ const CierreCaja: React.FC = () => {
     []
   );
 
-  type TfRows = Record<string, TfItem[]>;
-
-  const makeInitialTfRows = useCallback((): TfRows => {
-    const init: TfRows = {};
-    BANKS.forEach((b) => {
-      init[b.id] = [{ ref: "", amount: 0 }];
-    });
-    return init;
-  }, []);
-
   const [ventasTotales, setVentasTotales] = useState<number>(0);
   const [ventasCount, setVentasCount] = useState<number>(0);
+  const [ventasEfectivo, setVentasEfectivo] = useState<number>(0);
   const ventasProm = useMemo(
     () => (ventasCount > 0 ? fromCents(Math.round((ventasTotales / ventasCount) * 100)) : 0),
     [ventasTotales, ventasCount]
@@ -209,23 +190,21 @@ const CierreCaja: React.FC = () => {
   };
 
   const [showTfDrawer, setShowTfDrawer] = useState<boolean>(false);
-  const [tfRows, setTfRows] = useState<TfRows>(() => makeInitialTfRows());
 
   const resetFormulario = useCallback(() => {
     setEfectivoContado(0);
     setTransferVerificada(0);
     setTransferEsperada(0);
     setArqueo(makeEmptyArqueo());
-    setTfRows(makeInitialTfRows());
     setTotalSistema(0);
     setObservacionesArqueo("");
     setReporteVisible(false);
-  }, [makeEmptyArqueo, makeInitialTfRows]);
+  }, [makeEmptyArqueo]);
 
   const efectivoEsperadoCalc = useMemo(() => {
-    const cents = toCents(efectivoContado) + toCents(montoInicial);
+    const cents = toCents(ventasEfectivo) + toCents(montoInicial);
     return fromCents(Math.max(0, cents));
-  }, [efectivoContado, montoInicial]);
+  }, [ventasEfectivo, montoInicial]);
 
   useEffect(() => {
     setTotalSistema(efectivoEsperadoCalc);
@@ -276,7 +255,6 @@ const CierreCaja: React.FC = () => {
 
       // Cargar ventas del día anterior
       const ventas = await ventasService.getVentas('confirmada', fechaInicio, fechaFin);
-      setPreviousDayVentas(ventas);
 
       // Calcular totales
       let efectivo = 0;
@@ -323,9 +301,10 @@ const CierreCaja: React.FC = () => {
           const result = await ventasService.getTotalVentasSesion(sesionCaja.fecha_apertura);
           setVentasTotales(result.total);
           setVentasCount(result.count);
+          setVentasEfectivo(result.efectivo);
 
           // Calcular valores automáticamente
-          setEfectivoContado(result.efectivo);
+          setEfectivoContado(0); // Inicia en 0, el cajero lo cuenta manualmente
           setTransferVerificada(0); // Inicia en 0, se incrementa cuando se marcan como recibidas
           setTransferEsperada(result.transferencia); // Monto esperado de transferencias
 
@@ -346,6 +325,7 @@ const CierreCaja: React.FC = () => {
           console.error("Error cargando ventas de sesión:", error);
           setVentasTotales(0);
           setVentasCount(0);
+          setVentasEfectivo(0);
           setEfectivoContado(0);
           setTransferVerificada(0);
           setTransferEsperada(0);
@@ -728,16 +708,10 @@ const CierreCaja: React.FC = () => {
           esperado={efectivoEsperadoCalc}
           contado={efectivoContado}
           diferencia={diferencia}
-          // Enriquecer PDF:
-          detalleTransferencias={{
-            industrial: { banco: "Banco Industrial", items: tfRows.industrial ?? [] },
-            banrural: { banco: "Banrural", items: tfRows.banrural ?? [] },
-            trabajadores: { banco: "Banco de los Trabajadores", items: tfRows.trabajadores ?? [] },
-            gyt: { banco: "Banco G&T", items: tfRows.gyt ?? [] },
-          }}
           transferencias={transferencias}
           cajero={cajero}
           fechaApertura={fechaApertura}
+          ventasEfectivo={ventasEfectivo}
         />
       </div>
 
@@ -879,11 +853,11 @@ const CierreCaja: React.FC = () => {
                     esperado={previousDayTotales.total} // Simplificar
                     contado={previousDayTotales.efectivo}
                     diferencia={0} // No aplica
-                    detalleTransferencias={[]} // Simplificar
                     transferencias={previousDayTransferencias}
                     cajero={cajero}
                     fechaApertura={previousDayFecha ? `${previousDayFecha} 00:00:00` : ''}
                     fechaCierre={previousDayFecha ? `${previousDayFecha} 23:59:59` : ''}
+                    ventasEfectivo={previousDayTotales.efectivo}
                   />
                 )}
               </div>
@@ -1067,7 +1041,7 @@ function TransferDrawer({
 }: {
   open: boolean;
   onClose: () => void;
-  transferencias: unknown[]; // Ventas con tipo_pago = 'Transferencia'
+  transferencias: Venta[]; // Ventas con tipo_pago = 'Transferencia'
   loadingTransferencias: boolean;
   onUpdateEstado: (idVenta: number, estado: 'esperando' | 'recibido') => Promise<void>;
 }) {
@@ -1130,7 +1104,7 @@ function TransferDrawer({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {transferencias.map((venta) => (
+                  {transferencias.map((venta: VentaTransferencia) => (
                     <div key={venta.id_venta} className="rounded-xl border border-gray-200 shadow-sm p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
@@ -1257,11 +1231,11 @@ function ReportModal({
   esperado,
   contado,
   diferencia,
-  detalleTransferencias,
   transferencias,
   cajero,
   fechaApertura,
   titulo = "REPORTE DE CIERRE DE CAJA",
+  ventasEfectivo,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1271,11 +1245,11 @@ function ReportModal({
   esperado: number;
   contado: number;
   diferencia: number;
-  detalleTransferencias?: TfRowsFull;
-  transferencias: unknown[];
+  transferencias: Venta[];
   cajero?: string;
   fechaApertura?: string;
   titulo?: string;
+  ventasEfectivo: number;
 }) {
   const fechaCierre = useMemo(
     () =>
@@ -1296,12 +1270,13 @@ function ReportModal({
             /* Ocultar el nodo imprimible en pantalla sin usar display:none */
             @media screen {
               #reporte-cierre {
-                position: fixed;
-                left: -99999px;
-                top: -99999px;
-                width: 0;
-                height: 0;
-                overflow: hidden;
+                position: absolute;
+                left: -10000px;
+                top: -10000px;
+                width: 210mm;
+                height: 297mm;
+                opacity: 0;
+                pointer-events: none;
               }
             }
 
@@ -1323,32 +1298,20 @@ function ReportModal({
       }
 
       if (title?.includes('PDF')) {
-        // Usar html2pdf para generar PDF sin abrir nueva ventana
-        // Clonar el node para hacerlo visible temporalmente
-        const clonedNode = node.cloneNode(true) as HTMLElement;
-        clonedNode.style.position = '';
-        clonedNode.style.left = '';
-        clonedNode.style.top = '';
-        clonedNode.style.width = '';
-        clonedNode.style.height = '';
-        clonedNode.style.overflow = '';
-        // Hacerlo visible temporalmente
-        clonedNode.style.position = 'absolute';
-        clonedNode.style.left = '-9999px';
-        clonedNode.style.top = '0';
-        clonedNode.style.width = '210mm';
-        clonedNode.style.minHeight = '297mm';
-        document.body.appendChild(clonedNode);
-
         const opt = {
           margin: 0.5,
           filename: `cierre-caja-${new Date().toISOString().split('T')[0]}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
+          image: { type: 'jpeg' as const, quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+          jsPDF: { unit: 'in' as const, format: 'a4' as const, orientation: 'portrait' as const }
         };
-        html2pdf().set(opt).from(clonedNode).save().then(() => {
-          document.body.removeChild(clonedNode);
+
+        html2pdf().set(opt).from(node).outputPdf().then((pdf: Uint8Array) => {
+          const blob = new Blob([pdf as BlobPart], { type: 'application/pdf' });
+          const blobUrl = URL.createObjectURL(blob);
+          window.open(blobUrl, '_blank');
+        }).catch((error: unknown) => {
+          console.error('Error generando PDF:', error);
         });
         return;
       }
@@ -1410,21 +1373,21 @@ function ReportModal({
                     esperado={esperado}
                     contado={contado}
                     diferencia={diferencia}
-                    detalleTransferencias={detalleTransferencias}
                     transferencias={transferencias}
                     cajero={cajero}
                     fechaApertura={fechaApertura}
                     fechaCierre={fechaCierre}
+                    ventasEfectivo={ventasEfectivo}
                   />
                 </div>
               </div>
 
               <div className="flex justify-end gap-3 border-t p-4 bg-white flex-shrink-0">
-                <button onClick={() => openPrintWindow('Exportar PDF - SHUCAWY') } className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                <button onClick={() => openPrintWindow('Abrir PDF - SHUCWAY') } className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
                   <FaFilePdf size={18} />
-                  Exportar a PDF
+                  Abrir PDF
                 </button>
-                <button onClick={() => openPrintWindow('Imprimir - SHUCAWY')} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2">
+                <button onClick={() => openPrintWindow('Imprimir - SHUCWAY')} className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2">
                   <MdPrint size={18} />
                   Imprimir
                 </button>
@@ -1446,11 +1409,11 @@ function ReportModal({
               esperado={esperado}
               contado={contado}
               diferencia={diferencia}
-              detalleTransferencias={detalleTransferencias}
               transferencias={transferencias}
               cajero={cajero}
               fechaApertura={fechaApertura}
               fechaCierre={fechaCierre}
+              ventasEfectivo={ventasEfectivo}
             />
           </div>
 
@@ -1461,12 +1424,13 @@ function ReportModal({
             /* Ocultar el nodo imprimible en pantalla sin usar display:none */
             @media screen {
               #reporte-cierre {
-                position: fixed;
-                left: -99999px;
-                top: -99999px;
-                width: 0;
-                height: 0;
-                overflow: hidden;
+                position: absolute;
+                left: -10000px;
+                top: -10000px;
+                width: 210mm;
+                height: 297mm;
+                opacity: 0;
+                pointer-events: none;
               }
             }
 
@@ -1524,6 +1488,7 @@ function PrintableSheet({
   cajero,
   fechaApertura,
   fechaCierre,
+  ventasEfectivo,
 }: {
   titulo: string;
   ventasTotales: number;
@@ -1532,17 +1497,18 @@ function PrintableSheet({
   esperado: number;
   contado: number;
   diferencia: number;
-  transferencias: unknown[];
+  transferencias: Venta[];
   cajero?: string;
   fechaApertura?: string;
   fechaCierre: string;
+  ventasEfectivo: number;
 }) {
   return (
     <div className="sheet mx-auto bg-white rounded-xl border shadow-sm p-8">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-base font-bold text-gray-900">SHUCAWY</div>
+          <div className="text-base font-bold text-gray-900">SHUCWAY</div>
         </div>
         <div className="text-right">
           <div className="text-[10px] uppercase text-gray-500">Fecha de cierre</div>
@@ -1565,7 +1531,7 @@ function PrintableSheet({
           <Row label="Pagos con Tarjeta" value={currency(0)} />
           <Row label="Transferencias" value={currency(transferTotal)} />
           <div className="mt-2 border-t pt-2">
-            <Row label="Ventas en Efectivo" value={currency(contado)} strong />
+            <Row label="Ventas en Efectivo" value={currency(ventasEfectivo)} strong />
           </div>
         </div>
         <div className="rounded-lg border p-4">
@@ -1585,15 +1551,15 @@ function PrintableSheet({
           <SectionHeading>Transferencias verificadas por banco</SectionHeading>
           {Object.entries(
             transferencias
-              .filter(t => t.total_venta > 0 && t.estado_transferencia === 'recibido')
-              .reduce((acc, t) => {
-                const banco = t.deposito_banco?.banco || 'Sin banco';
+              .filter((t: VentaTransferencia) => t.total_venta > 0 && t.estado_transferencia === 'recibido')
+              .reduce((acc: Record<string, VentaTransferencia[]>, t: VentaTransferencia) => {
+                const banco = 'Transferencia'; // Simplificar por ahora
                 if (!acc[banco]) acc[banco] = [];
                 acc[banco].push(t);
                 return acc;
-              }, {} as Record<string, unknown[]>)
-          ).map(([banco, transfers]) => {
-            const subtotal = transfers.reduce((sum, t) => sum + (t.total_venta || 0), 0);
+              }, {} as Record<string, Venta[]>)
+          ).map(([banco, transfers]: [string, VentaTransferencia[]]) => {
+            const subtotal = transfers.reduce((sum: number, t: VentaTransferencia) => sum + (t.total_venta || 0), 0);
             return (
               <div key={banco} className="mb-4 last:mb-0 break-inside-avoid">
                 <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
@@ -1613,7 +1579,7 @@ function PrintableSheet({
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {transfers.map((t: unknown, idx) => (
+                      {transfers.map((t: VentaTransferencia, idx) => (
                         <tr key={t.id_venta}>
                           <td className="px-3 py-1">{idx + 1}</td>
                           <td className="px-3 py-1">{t.cliente?.nombre || 'Sin cliente'}</td>

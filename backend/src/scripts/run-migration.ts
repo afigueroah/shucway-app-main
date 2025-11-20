@@ -7,7 +7,7 @@ async function runMigration() {
   let pool: Pool | null = null;
 
   try {
-    console.log('🚀 Ejecutando migración: add_acumula_puntos_to_venta');
+    console.log('🚀 Ejecutando migración: fix_historial_puntos_constraint');
 
     // Verificar que tenemos las credenciales de PostgreSQL
     if (!config.supabase.dbHost || !config.supabase.dbUser || !config.supabase.dbPassword) {
@@ -27,7 +27,7 @@ async function runMigration() {
     });
 
     // Leer el archivo de migración
-    const migrationPath = join(__dirname, '../../../migrations/20251119_add_acumula_puntos_to_venta.sql');
+    const migrationPath = join(__dirname, '../../../migrations/20251119_fix_historial_puntos_constraint.sql');
     const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
     console.log('📄 Contenido de la migración:');

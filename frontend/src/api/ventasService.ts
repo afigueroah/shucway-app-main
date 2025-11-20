@@ -63,6 +63,14 @@ export interface VentaCompleta extends Venta {
   detalles: DetalleVenta[];
 }
 
+export interface VentaTransferencia extends Venta {
+  deposito_banco?: {
+    numero_referencia?: string;
+    nombre_banco?: string;
+    nombre_cliente?: string;
+  } | null;
+}
+
 export interface ProductoPopular {
   id_producto: number;
   nombre_producto: string;
@@ -232,7 +240,7 @@ export const ventasService = {
   },
 
   // Obtener transferencias de la sesión
-  async getTransferenciasSesion(fechaInicio: string): Promise<Venta[]> {
+  async getTransferenciasSesion(fechaInicio: string): Promise<VentaTransferencia[]> {
     try {
       const response = await apiClient.get(`/ventas/transferencias-sesion?fechaInicio=${fechaInicio}`);
       return response.data.data;

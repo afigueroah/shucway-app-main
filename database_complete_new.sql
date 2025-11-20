@@ -2342,9 +2342,9 @@ BEGIN
     ) VALUES (
         v_id_cliente,
         p_id_venta,
-        CASE WHEN v_puntos_nuevos = 0 THEN 'reset' ELSE 'acumulacion' END,
+        CASE WHEN v_puntos_nuevos = 0 THEN 'ajuste' ELSE 'acumulacion' END,
         v_puntos_anteriores,
-        CASE WHEN v_puntos_nuevos = 0 THEN -v_puntos_anteriores ELSE 1 END,
+        CASE WHEN v_puntos_nuevos = 0 THEN -10 ELSE 1 END,
         v_puntos_nuevos,
         CASE WHEN v_puntos_nuevos = 0 THEN 'Reset de puntos después de 10 acumulaciones' ELSE 'Punto acumulado por venta' END,
         p_id_cajero

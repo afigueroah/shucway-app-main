@@ -362,7 +362,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const AuditoriaQuick: React.FC = () => {
     const [auditoriaActiva, setAuditoriaActiva] = useState<string | null>(() => {
       try {
-        return localStore.get('auditoria_activa') as string | null;
+        const value = localStore.get('auditoria_activa') as string | null;
+        return value && value.trim() !== '' ? value : null;
       } catch {
         return null;
       }
@@ -391,22 +392,36 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           const activa = localStore.get('auditoria_activa') as string | null;
           const label = (localStore.get('auditoria_label') as string) || 'Auditoría';
           const fecha = (localStore.get('auditoria_fecha') as string) || '';
-          setAuditoriaActiva(activa);
+          setAuditoriaActiva(activa && activa.trim() !== '' ? activa : null);
           setAuditoriaLabel(label);
           setAuditoriaFecha(fecha);
         }
+      };
+
+      const handleAuditoriaChanged = () => {
+        // Forzar actualización del estado cuando cambia la auditoría
+        const activa = localStore.get('auditoria_activa') as string | null;
+        const label = (localStore.get('auditoria_label') as string) || 'Auditoría';
+        const fecha = (localStore.get('auditoria_fecha') as string) || '';
+        setAuditoriaActiva(activa && activa.trim() !== '' ? activa : null);
+        setAuditoriaLabel(label);
+        setAuditoriaFecha(fecha);
       };
 
       // Verificar estado inicial
       const activa = localStore.get('auditoria_activa') as string | null;
       const label = (localStore.get('auditoria_label') as string) || 'Auditoría';
       const fecha = (localStore.get('auditoria_fecha') as string) || '';
-      setAuditoriaActiva(activa);
+      setAuditoriaActiva(activa && activa.trim() !== '' ? activa : null);
       setAuditoriaLabel(label);
       setAuditoriaFecha(fecha);
 
       window.addEventListener('storage', handleStorageChange);
-      return () => window.removeEventListener('storage', handleStorageChange);
+      window.addEventListener('auditoria-changed', handleAuditoriaChanged);
+      return () => {
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('auditoria-changed', handleAuditoriaChanged);
+      };
     }, []);
 
     const formatDateSpanish = (dateStr: string) => {

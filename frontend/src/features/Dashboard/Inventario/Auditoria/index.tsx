@@ -175,7 +175,7 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
   const [sessionId, setSessionId] = useState<string | undefined>(() => {
     if (initialSessionId) return initialSessionId;
     // Intentar restaurar auditoría activa desde localStorage
-    const stored = localStorage.getItem('auditoria_activa');
+    const stored = localStore.get('auditoria_activa');
     return stored || undefined;
   });
   const [sessionDate, setSessionDate] = useState<string | undefined>();
@@ -221,16 +221,16 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
   // Abre modal de bienvenida auto si no hay sesión activa
   useEffect(() => {
     // Solo abrir modal si NO hay auditoría activa (ni en props ni en localStorage)
-    const storedAudit = localStorage.getItem('auditoria_activa');
+    const storedAudit = localStore.get('auditoria_activa');
     if (!initialSessionId && !storedAudit) {
       setShowStartModal(true);
     }
     
     // Restaurar datos de auditoría desde localStorage
     if (storedAudit && !initialSessionId) {
-      const storedLabel = localStorage.getItem('auditoria_label');
-      const storedFecha = localStorage.getItem('auditoria_fecha');
-      const storedEstado = localStorage.getItem('auditoria_estado') as 'en_progreso' | 'completada' | 'cancelada' | null;
+      const storedLabel = localStore.get('auditoria_label');
+      const storedFecha = localStore.get('auditoria_fecha');
+      const storedEstado = localStore.get('auditoria_estado') as 'en_progreso' | 'completada' | 'cancelada' | null;
       
       if (storedLabel) setSessionLabel(storedLabel);
       if (storedFecha) setSessionDate(storedFecha);
@@ -417,11 +417,34 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
         if (auditoriaData.nombre_auditoria) setSessionLabel(auditoriaData.nombre_auditoria);
         if (auditoriaData.fecha_inicio_auditoria) setSessionDate(auditoriaData.fecha_inicio_auditoria);
         // Actualizar localStorage también
-        localStorage.setItem('auditoria_estado', auditoriaData.estado);
+        localStore.set('auditoria_estado', auditoriaData.estado);
       }
 
       // Cargar desde el backend endpoint (respeta RLS)
-      const token = localStorage.getItem("access_token");
+      const token = localStore.get("access_token");
+      console.log('🔍 Token obtenido:', token ? 'Presente' : 'Ausente');
+      console.log('🔍 URL de API:', import.meta.env.VITE_API_URL);
+      console.log('🔍 ID de auditoría:', idAuditoria);
+
+      // Primero probar autenticación
+      try {
+        const testResponse = await fetch(`${import.meta.env.VITE_API_URL}/auditoria/test-auth`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('🔍 Test auth response:', testResponse.status);
+        if (testResponse.ok) {
+          const testData = await testResponse.json();
+          console.log('🔍 Test auth data:', testData);
+        } else {
+          console.error('❌ Test auth failed:', testResponse.status);
+        }
+      } catch (testError) {
+        console.error('❌ Test auth error:', testError);
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/auditoria/detalle/${idAuditoria}`,
         {
@@ -683,10 +706,10 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
       setSessionEstado('en_progreso');
       
       // ✅ PERSISTIR EN LOCALSTORAGE
-      localStorage.setItem('auditoria_activa', idAuditoria);
-      localStorage.setItem('auditoria_label', auditLabel);
-      localStorage.setItem('auditoria_fecha', new Date().toISOString());
-      localStorage.setItem('auditoria_estado', 'en_progreso');
+      localStore.set('auditoria_activa', idAuditoria);
+      localStore.set('auditoria_label', auditLabel);
+      localStore.set('auditoria_fecha', new Date().toISOString());
+      localStore.set('auditoria_estado', 'en_progreso');
       
       // ✅ DISPARAR EVENTO PARA ACTUALIZAR CONTADOR
       window.dispatchEvent(new Event('auditoria-changed'));
@@ -892,10 +915,10 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
       clearFilters();
       
       // ✅ LIMPIAR LOCALSTORAGE
-      localStorage.removeItem('auditoria_activa');
-      localStorage.removeItem('auditoria_label');
-      localStorage.removeItem('auditoria_fecha');
-      localStorage.removeItem('auditoria_estado');
+      localStore.set('auditoria_activa', '');
+      localStore.set('auditoria_label', '');
+      localStore.set('auditoria_fecha', '');
+      localStore.set('auditoria_estado', '');
       
       // ✅ DISPARAR EVENTO PARA ACTUALIZAR CONTADOR
       window.dispatchEvent(new Event('auditoria-changed'));
@@ -954,17 +977,17 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
 
       // Limpiar estado local independientemente del resultado del servidor
       setSessionEstado('cancelada');
-      localStorage.setItem('auditoria_estado', 'cancelada');
+      localStore.set('auditoria_estado', 'cancelada');
 
       // Limpiar sesión
       setSessionId(undefined);
       setSessionDate(undefined);
       setSessionLabel(undefined);
       setRows([]);
-      localStorage.removeItem('auditoria_activa');
-      localStorage.removeItem('auditoria_label');
-      localStorage.removeItem('auditoria_fecha');
-      localStorage.removeItem('auditoria_estado');
+      localStore.set('auditoria_activa', '');
+      localStore.set('auditoria_label', '');
+      localStore.set('auditoria_fecha', '');
+      localStore.set('auditoria_estado', 'cancelada');
 
       // Mostrar modal de éxito
       setShowCancelConfirmModal(false);
@@ -982,15 +1005,15 @@ const Auditoria: React.FC<AuditoriaProps> = ({ initialSessionId, auditorName }) 
       
       // Aún si hay error de red, limpiamos el estado local
       setSessionEstado('cancelada');
-      localStorage.setItem('auditoria_estado', 'cancelada');
+      localStore.set('auditoria_estado', 'cancelada');
       setSessionId(undefined);
       setSessionDate(undefined);
       setSessionLabel(undefined);
       setRows([]);
-      localStorage.removeItem('auditoria_activa');
-      localStorage.removeItem('auditoria_label');
-      localStorage.removeItem('auditoria_fecha');
-      localStorage.removeItem('auditoria_estado');
+      localStore.set('auditoria_activa', '');
+      localStore.set('auditoria_label', '');
+      localStore.set('auditoria_fecha', '');
+      localStore.set('auditoria_estado', 'cancelada');
       
       setShowCancelConfirmModal(false);
       setShowCancelSuccessModal(true);

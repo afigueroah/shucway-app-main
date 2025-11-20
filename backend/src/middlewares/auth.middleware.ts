@@ -34,7 +34,7 @@ export const authenticateToken = (
     }
 
     if (!token) {
-      logger.warn('❌ Token no proporcionado');
+      logger.warn(`❌ Token no proporcionado - Path: ${req.path}`);
       res.status(401).json({ success: false, error: 'Token no proporcionado' });
       return;
     }

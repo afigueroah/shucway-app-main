@@ -30,7 +30,9 @@ export class VentasService {
         if (value.includes('T')) {
           return endOfDay ? value : value;
         }
-        return endOfDay ? `${value}T23:59:59.999` : `${value}T00:00:00.000`;
+        // Convertir fecha con espacio a formato ISO
+        const isoDate = value.replace(' ', 'T');
+        return endOfDay ? `${isoDate.replace(/T\d{2}:\d{2}:\d{2}/, 'T23:59:59.999')}` : `${isoDate}.000`;
       };
 
       const fechaInicioIso = normalizeDateParam(fechaInicio, false);
@@ -330,7 +332,8 @@ export class VentasService {
     // - fn_acumular_puntos_venta (trigger automático)
 
     // 4. Manejar canje de puntos si existe
-    if (dto.puntos_usados && dto.puntos_usados > 0 && dto.id_cliente) {
+    const tieneCanjePuntos = dto.detalles.some(detalle => detalle.es_canje_puntos);
+    if ((dto.puntos_usados && dto.puntos_usados > 0 && dto.id_cliente) || (tieneCanjePuntos && dto.id_cliente)) {
       const { error: canjeError } = await supabase.rpc('fn_canjear_puntos', {
         p_id_cliente: dto.id_cliente,
         p_id_venta: venta.id_venta,
