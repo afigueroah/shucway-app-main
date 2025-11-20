@@ -12,7 +12,7 @@ const router = Router();
 router.get('/test-auth', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     console.log('✅ Test auth exitoso:', {
-      userId: req.user?.id,
+      userId: req.user?.id_perfil,
       userEmail: req.user?.email,
       userRole: req.user?.role?.nombre_rol
     });
@@ -20,7 +20,7 @@ router.get('/test-auth', authenticateToken, async (req: AuthRequest, res: Respon
       success: true,
       message: 'Autenticación exitosa',
       user: {
-        id: req.user?.id,
+        id: req.user?.id_perfil,
         email: req.user?.email,
         role: req.user?.role?.nombre_rol
       }
@@ -39,7 +39,7 @@ router.get('/test-auth', authenticateToken, async (req: AuthRequest, res: Respon
 router.get('/detalle/:id_auditoria', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { id_auditoria } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.id_perfil;
     const userRole = req.user?.role?.nombre_rol;
 
     console.log('🔍 Cargando detalles de auditoría:', {
@@ -75,7 +75,7 @@ router.get('/detalle/:id_auditoria', authenticateToken, async (req: AuthRequest,
     // Verificar permisos del usuario para esta auditoría
     // Por ahora, permitir acceso a todos los usuarios autenticados
     console.log('🔍 Usuario autorizado para acceder a auditoría:', {
-      userId: req.user?.id,
+      userId: req.user?.id_perfil,
       userRole: req.user?.role?.nombre_rol,
       auditoriaId: id_auditoria
     });
