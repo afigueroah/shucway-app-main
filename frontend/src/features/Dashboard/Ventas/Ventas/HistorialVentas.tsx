@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ventasService, type Venta, type VentaCompleta, type DetalleVenta } from '@/api/ventasService';
 import { MetodoIcon } from '@/components/MetodoIcon';
 import { PiTrashBold, PiEyeBold } from 'react-icons/pi';
@@ -27,6 +28,8 @@ const HistorialVentas: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const totalPages = Math.ceil(ventas.length / pageSize);
   const displayedVentas = ventas.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadVentas();

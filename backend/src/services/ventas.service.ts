@@ -28,11 +28,11 @@ export class VentasService {
       const normalizeDateParam = (value?: string, endOfDay: boolean = false) => {
         if (!value) return undefined;
         if (value.includes('T')) {
-          return endOfDay ? value : value;
+          return endOfDay ? value.replace(/T\d{2}:\d{2}:\d{2}/, 'T23:59:59.999') : value.replace(/T\d{2}:\d{2}:\d{2}/, 'T00:00:00.000');
         }
-        // Convertir fecha con espacio a formato ISO
-        const isoDate = value.replace(' ', 'T');
-        return endOfDay ? `${isoDate.replace(/T\d{2}:\d{2}:\d{2}/, 'T23:59:59.999')}` : `${isoDate}.000`;
+        // Convertir fecha sin hora a timestamp completo
+        const isoDate = value;
+        return endOfDay ? `${isoDate}T23:59:59.999` : `${isoDate}T00:00:00.000`;
       };
 
       const fechaInicioIso = normalizeDateParam(fechaInicio, false);
