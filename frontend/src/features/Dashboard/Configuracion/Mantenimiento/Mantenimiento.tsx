@@ -91,6 +91,7 @@ const Mantenimiento: React.FC = () => {
   const [restoreModalVisible, setRestoreModalVisible] = useState(false);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const handleRestoreBackup = async () => {
     if (!restoreFile) {
