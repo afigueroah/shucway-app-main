@@ -181,7 +181,7 @@ export default function CategoriasProductos() {
           {/* Izquierda: regresar, búsqueda y filtro */}
           <div className="flex items-center gap-3">
             <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-100" title="Regresar">←</button>
-            <h3 className="text-base font-semibold">Gestión de Gastos Operativos</h3>
+            <h3 className="text-base font-semibold">Gestión de Categoria de Productos</h3>
 
             <label className="sr-only" htmlFor="cat-search">Buscar</label>
             <input id="cat-search" placeholder="Buscar categorías…" value={q} onChange={(e) => setQ(e.target.value)} className="h-10 w-64 rounded-lg border border-gray-200 bg-white pl-3 pr-3 text-sm text-gray-700 focus:outline-none" />

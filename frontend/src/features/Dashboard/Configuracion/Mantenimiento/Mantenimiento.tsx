@@ -27,37 +27,10 @@ const formatTableLabel = (tableName: string) =>
   tableName ? tableName.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()) : '';
 
 const TABLE_GROUPS: Record<string, string[]> = {
-  'Autenticación y seguridad': ['rol_usuario', 'perfil_usuario', 'bitacora_seguridad'],
-  Inventario: [
-    'categoria_insumo',
-    'insumo',
-    'insumo_presentacion',
-    'lote_insumo',
-    'movimiento_inventario',
-    'bitacora_inventario',
+  'Auditoría y bitácoras': [
+    'auditoria_inventario', 'auditoria_detalle', 'bitacora_auditoria',
+    'bitacora_seguridad', 'bitacora_inventario', 'bitacora_ventas', 'bitacora_ordenes_compra', 'bitacora_productos'
   ],
-  'Compras y proveedores': [
-    'proveedor',
-    'orden_compra',
-    'detalle_orden_compra',
-    'recepcion_mercaderia',
-    'detalle_recepcion_mercaderia',
-    'bitacora_ordenes_compra',
-  ],
-  'Productos y ventas': [
-    'categoria_producto',
-    'producto',
-    'producto_variante',
-    'receta_detalle',
-    'cliente',
-    'venta',
-    'detalle_venta',
-    'historial_puntos',
-    'bitacora_productos',
-    'bitacora_ventas',
-  ],
-  'Gastos y finanzas': ['categoria_gasto', 'gasto_operativo', 'deposito_banco', 'arqueo_caja'],
-  Auditoría: ['auditoria_inventario', 'auditoria_detalle', 'bitacora_auditoria'],
 };
 
 const SCHEMA_TABLE_MAP = dbSchema.tables as Record<string, TableMeta>;
@@ -182,6 +155,8 @@ const Mantenimiento: React.FC = () => {
     const entry = Object.entries(TABLE_GROUPS).find(([, tableList]) => tableList.includes(selectedTable));
     return entry ? entry[0] : null;
   }, [selectedTable]);
+
+  const isLogTable = selectedTable.startsWith('bitacora_') || selectedTable.startsWith('auditoria_');
 
   const handleRestore = async (record: TableRecord) => {
     Modal.confirm({
@@ -831,23 +806,25 @@ const Mantenimiento: React.FC = () => {
           shape="circle"
           icon={<FaEye />}
           onClick={() => handleView(record)}
-          className="border-0 bg-emerald-600 text-white hover:bg-emerald-700"
+          className="border-0 bg-transparent text-gray-600 hover:text-gray-800"
         />
-        <Button
-          size="small"
-          shape="circle"
-          icon={<FaEdit />}
-          onClick={() => handleEdit(record)}
-          className="border-0 bg-yellow-400 text-white hover:bg-yellow-500"
-        />
-        {/* Mostrar botón Restaurar si el registro está eliminado */}
-        {((estadoField && isDeletedValue(record[estadoField])) || (activoField && (record[activoField] === false || String(record[activoField]) === 'false'))) && (
+        {!isLogTable && (
+          <Button
+            size="small"
+            shape="circle"
+            icon={<FaEdit />}
+            onClick={() => handleEdit(record)}
+            className="border-0 bg-transparent text-gray-600 hover:text-gray-800"
+          />
+        )}
+        {/* Mostrar botón Restaurar si el registro está eliminado y no es log table */}
+        {!isLogTable && ((estadoField && isDeletedValue(record[estadoField])) || (activoField && (record[activoField] === false || String(record[activoField]) === 'false'))) && (
           <Button
             size="small"
             shape="circle"
             icon={<FaUndo />}
             onClick={() => handleRestore(record)}
-            className="border-0 bg-emerald-700 text-white hover:bg-emerald-800"
+            className="border-0 bg-transparent text-gray-600 hover:text-gray-800"
           />
         )}
         <Button
@@ -855,7 +832,7 @@ const Mantenimiento: React.FC = () => {
           shape="circle"
           icon={<FaTrash />}
           onClick={() => handleDelete(record)}
-          className="border-0 bg-red-500 text-white hover:bg-red-600"
+          className="border-0 bg-transparent text-gray-600 hover:text-gray-800"
         />
       </div>
     )
@@ -1066,6 +1043,7 @@ const Mantenimiento: React.FC = () => {
               type="primary"
               icon={<RollbackOutlined />}
               onClick={() => setRestoreModalVisible(true)}
+              style={{ backgroundColor: colors.secondary, borderColor: colors.secondary, fontWeight: 'bold' }}
             >
               Restaurar Backup
             </Button>
@@ -1171,47 +1149,16 @@ const Mantenimiento: React.FC = () => {
                     >
                       {showFilters ? 'Ocultar filtros' : 'Filtros'}
                     </Button>
-                    <Button
-                      onClick={() => setShowDeleted((prev) => !prev)}
-                      type={showDeleted ? 'primary' : 'default'}
-                      style={
-                        showDeleted
-                          ? { backgroundColor: colors.secondary, borderColor: colors.secondary }
-                          : { borderColor: colors.secondary, color: colors.secondary }
-                      }
-                    >
-                      {showDeleted ? 'Ver activos' : 'Mostrar eliminados'}
-                    </Button>
-                    <Dropdown
-                      menu={{
-                        items: columns.map((col, index) => ({
-                          key: index,
-                          label: (
-                            <div className="flex w-48 items-center justify-between py-2">
-                              <span>{col.title}</span>
-                              <Switch
-                                checked={!col.hidden}
-                                onChange={() => handleColumnToggle(col.key)}
-                                size="small"
-                              />
-                            </div>
-                          )
-                        }))
-                      }}
-                      trigger={['click']}
-                    >
-                      <Button icon={<FaColumns />} style={{ borderColor: colors.secondary, color: colors.secondary }}>
-                        Columnas
+                    {!isLogTable && (
+                      <Button
+                        type="primary"
+                        icon={<FaPlus />}
+                        onClick={handleAdd}
+                        style={{ backgroundColor: colors.primary, borderColor: colors.primary }}
+                      >
+                        Agregar {selectedTableLabel.toLowerCase()}
                       </Button>
-                    </Dropdown>
-                    <Button
-                      type="primary"
-                      icon={<FaPlus />}
-                      onClick={handleAdd}
-                      style={{ backgroundColor: colors.primary, borderColor: colors.primary }}
-                    >
-                      Agregar {selectedTableLabel.toLowerCase()}
-                    </Button>
+                    )}
                   </div>
                 </div>
 

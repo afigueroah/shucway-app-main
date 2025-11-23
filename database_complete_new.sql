@@ -274,7 +274,6 @@ CREATE TABLE receta_detalle (
     id_insumo INTEGER NOT NULL REFERENCES insumo(id_insumo) ON DELETE RESTRICT,
     cantidad_requerida DECIMAL(10,3) NOT NULL,
     unidad_base VARCHAR(20),
-    es_obligatorio BOOLEAN DEFAULT TRUE,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(id_producto, id_insumo, id_variante)
 );
@@ -2429,3 +2428,160 @@ EXECUTE FUNCTION trg_acumular_puntos_venta();
 
 -- Agregar campo para estado de transferencias
 ALTER TABLE venta ADD COLUMN IF NOT EXISTS estado_transferencia VARCHAR(20) DEFAULT 'esperando' CHECK (estado_transferencia IN ('esperando', 'recibido'));
+
+-- ===============================================
+-- FUNCIÓN PARA EJECUTAR SQL (SOLO PARA ADMINISTRADORES)
+-- ===============================================
+
+-- Función para ejecutar SQL arbitrario (USAR CON PRECAUCIÓN)
+-- Solo debe ser accesible para usuarios con rol 'propietario' o 'administrador'
+CREATE OR REPLACE FUNCTION execute_sql(sql_query TEXT)
+RETURNS VOID AS $$
+BEGIN
+  -- Validar que el SQL no contenga comandos peligrosos
+  IF sql_query ~* '(DROP\s+DATABASE|CREATE\s+DATABASE|ALTER\s+SYSTEM|GRANT|REVOKE|CREATE\s+ROLE|DROP\s+ROLE)' THEN
+    RAISE EXCEPTION 'Comando SQL no permitido: %', sql_query;
+  END IF;
+
+  -- Ejecutar el SQL
+  EXECUTE sql_query;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ===============================================
+-- FUNCIONES PARA BITÁCORA DE PRODUCTOS
+-- ===============================================
+
+-- Función para bitácora de productos
+CREATE OR REPLACE FUNCTION fn_bitacora_productos()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_accion VARCHAR(50);
+    v_descripcion TEXT;
+    v_campo_modificado VARCHAR(100);
+    v_valor_anterior TEXT;
+    v_valor_nuevo TEXT;
+BEGIN
+    -- Determinar la acción
+    IF TG_OP = 'INSERT' THEN
+        v_accion := 'creacion';
+        v_descripcion := 'Creación de producto';
+        v_campo_modificado := 'producto';
+        v_valor_anterior := NULL;
+        v_valor_nuevo := NEW.nombre_producto;
+    ELSIF TG_OP = 'UPDATE' THEN
+        v_accion := 'actualizacion';
+        v_descripcion := 'Actualización de producto';
+        -- Para simplificar, registrar cambio en nombre o estado
+        IF OLD.nombre_producto != NEW.nombre_producto THEN
+            v_campo_modificado := 'nombre_producto';
+            v_valor_anterior := OLD.nombre_producto;
+            v_valor_nuevo := NEW.nombre_producto;
+        ELSIF OLD.estado != NEW.estado THEN
+            v_campo_modificado := 'estado';
+            v_valor_anterior := OLD.estado;
+            v_valor_nuevo := NEW.estado;
+        ELSE
+            v_campo_modificado := 'modificacion_general';
+            v_valor_anterior := 'datos_anteriores';
+            v_valor_nuevo := 'datos_nuevos';
+        END IF;
+    ELSIF TG_OP = 'DELETE' THEN
+        v_accion := 'eliminacion';
+        v_descripcion := 'Eliminación de producto';
+        v_campo_modificado := 'producto';
+        v_valor_anterior := OLD.nombre_producto;
+        v_valor_nuevo := NULL;
+    END IF;
+
+    -- Insertar en bitácora
+    INSERT INTO bitacora_productos (
+        id_producto, accion, campo_modificado, valor_anterior, valor_nuevo,
+        id_perfil, descripcion
+    ) VALUES (
+        COALESCE(NEW.id_producto, OLD.id_producto),
+        v_accion,
+        v_campo_modificado,
+        v_valor_anterior,
+        v_valor_nuevo,
+        NULL, -- No hay id_perfil en producto, usar NULL
+        v_descripcion
+    );
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Crear trigger de bitácora para productos
+DROP TRIGGER IF EXISTS trg_bitacora_productos ON producto;
+CREATE TRIGGER trg_bitacora_productos
+AFTER INSERT OR UPDATE OR DELETE ON producto
+FOR EACH ROW
+EXECUTE FUNCTION fn_bitacora_productos();
+
+-- ===============================================
+-- FUNCIONES PARA BITÁCORA DE VENTAS
+-- ===============================================
+
+-- Función para bitácora de ventas
+CREATE OR REPLACE FUNCTION fn_bitacora_ventas()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_accion VARCHAR(50);
+    v_descripcion TEXT;
+    v_campo_modificado VARCHAR(100);
+    v_valor_anterior TEXT;
+    v_valor_nuevo TEXT;
+BEGIN
+    -- Determinar la acción
+    IF TG_OP = 'INSERT' THEN
+        v_accion := 'creacion';
+        v_descripcion := 'Creación de venta';
+        v_campo_modificado := 'venta';
+        v_valor_anterior := NULL;
+        v_valor_nuevo := 'Nueva venta';
+    ELSIF TG_OP = 'UPDATE' THEN
+        v_accion := 'actualizacion';
+        v_descripcion := 'Actualización de venta';
+        -- Registrar cambio en estado
+        IF OLD.estado != NEW.estado THEN
+            v_campo_modificado := 'estado';
+            v_valor_anterior := OLD.estado;
+            v_valor_nuevo := NEW.estado;
+        ELSE
+            v_campo_modificado := 'modificacion_general';
+            v_valor_anterior := 'datos_anteriores';
+            v_valor_nuevo := 'datos_nuevos';
+        END IF;
+    ELSIF TG_OP = 'DELETE' THEN
+        v_accion := 'eliminacion';
+        v_descripcion := 'Eliminación de venta';
+        v_campo_modificado := 'venta';
+        v_valor_anterior := 'Venta eliminada';
+        v_valor_nuevo := NULL;
+    END IF;
+
+    -- Insertar en bitácora
+    INSERT INTO bitacora_ventas (
+        id_venta, accion, campo_modificado, valor_anterior, valor_nuevo,
+        id_perfil, descripcion
+    ) VALUES (
+        COALESCE(NEW.id_venta, OLD.id_venta),
+        v_accion,
+        v_campo_modificado,
+        v_valor_anterior,
+        v_valor_nuevo,
+        COALESCE(NEW.id_cajero, OLD.id_cajero),
+        v_descripcion
+    );
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Crear trigger de bitácora para ventas
+DROP TRIGGER IF EXISTS trg_bitacora_ventas ON venta;
+CREATE TRIGGER trg_bitacora_ventas
+AFTER INSERT OR UPDATE OR DELETE ON venta
+FOR EACH ROW
+EXECUTE FUNCTION fn_bitacora_ventas();

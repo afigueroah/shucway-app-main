@@ -28,6 +28,7 @@ export interface ProductoVariante {
   nombre_variante: string;
   precio_variante: number;
   costo_variante?: number;
+  cantidad_insumo?: number;  // Cantidad del insumo a descontar del inventario
   estado: 'activo' | 'desactivado';
 }
 
@@ -38,7 +39,7 @@ export interface RecetaDetalle {
   id_insumo: number;
   cantidad_requerida: number;
   unidad_base: string;
-  es_obligatorio?: boolean;
+  // Eliminado: es_obligatorio ya no se almacena en receta_detalle
 }
 
 export interface BitacoraProductos {
@@ -86,6 +87,7 @@ export interface CreateVarianteDTO {
   nombre_variante: string;
   precio_variante: number;
   costo_variante?: number;
+  cantidad_insumo?: number;  // Cantidad del insumo a descontar
   estado?: 'activo' | 'desactivado';
 }
 
@@ -95,7 +97,7 @@ export interface CreateRecetaDTO {
   id_insumo: number;
   cantidad_requerida: number;
   unidad_base: string;
-  es_obligatorio?: boolean;
+  // Eliminado: es_obligatorio ya no se parte del DTO
 }
 
 export interface ProductoConReceta extends Producto {

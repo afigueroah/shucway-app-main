@@ -775,17 +775,36 @@ export class VentasService {
   /**
    * Actualizar estado de transferencia de una venta
    */
-  async updateEstadoTransferencia(idVenta: number, estado: 'esperando' | 'recibido'): Promise<void> {
+  async updateEstadoTransferencia(idVenta: number, data: { estado?: 'esperando' | 'recibido'; numero_referencia?: string; nombre_banco?: string }): Promise<void> {
     try {
-      // Actualizar el estado de la transferencia
-      const { error } = await supabase
-        .from('venta')
-        .update({ estado_transferencia: estado })
-        .eq('id_venta', idVenta)
-        .eq('tipo_pago', 'Transferencia');
+      // 1) Actualizar estado si se indicó
+      if (data.estado) {
+        const { error: stateError } = await supabase
+          .from('venta')
+          .update({ estado_transferencia: data.estado })
+          .eq('id_venta', idVenta)
+          .eq('tipo_pago', 'Transferencia');
 
-      if (error) {
-        throw new Error(`Error al actualizar estado de transferencia: ${error.message}`);
+        if (stateError) {
+          throw new Error(`Error al actualizar estado de transferencia: ${stateError.message}`);
+        }
+      }
+
+      // 2) Actualizar depósito bancario (referencia / banco) si se proporcionó
+      if (typeof data.numero_referencia !== 'undefined' || typeof data.nombre_banco !== 'undefined') {
+        const { error: depError } = await supabase
+          .from('deposito_banco')
+          .update({
+            numero_referencia: data.numero_referencia ?? null,
+            nombre_banco: data.nombre_banco ?? null,
+          })
+          .eq('descripcion', `Pago por venta #${idVenta}`)
+          .eq('tipo_pago', 'Transferencia');
+
+        if (depError) {
+          console.error(`Error al actualizar depósito bancario: ${depError.message}`);
+          // No lanzar para no bloquear la actualización de estado si fue exitosa
+        }
       }
     } catch (error) {
       console.error('Error en updateEstadoTransferencia:', error);

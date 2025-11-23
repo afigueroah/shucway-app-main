@@ -68,10 +68,11 @@ type Producto = {
 type VarianteForm = {
   id_variante?: number;
   nombre_variante: string;
-  precio_variante: number;
+  precio_variante?: number;
   costo_variante?: number;
   estado?: 'activo' | 'desactivado';
   id_insumo?: number;
+  cantidad_insumo?: number;  // Cantidad del insumo a descontar
 };
 
 type FormProducto = Omit<Producto, "id"> & { id?: string; variantes?: VarianteForm[] };
@@ -82,7 +83,7 @@ type RecetaLinea = {
   id_insumo: number;
   cantidad_insumo: number;
   unidad_medida: string;
-  es_obligatorio: boolean;
+  // es_obligatorio removed from the UI / model (handled as NOT obligatory by default)
   insumo?: {
     nombre: string;
     costo_promedio: number;
@@ -414,7 +415,7 @@ export default function ProductosPage() {
             id_insumo: detalle.id_insumo,
             cantidad_insumo: detalle.cantidad_requerida,
             unidad_medida: detalle.unidad_base,
-            es_obligatorio: true,
+            // es_obligatorio removed: default NOT obligatory (false)
             insumo: insumoEncontrado
               ? { nombre: insumoEncontrado.nombre, costo_promedio: insumoEncontrado.costo_promedio }
               : undefined,
@@ -471,19 +472,15 @@ export default function ProductosPage() {
         .map((variant) => ({
           id_variante: variant.id_variante,
           nombre_variante: variant.nombre_variante.trim(),
-          precio_variante: Number(variant.precio_variante || 0),
+          precio_variante: variant.precio_variante != null ? Number(variant.precio_variante) : undefined,
           costo_variante: variant.costo_variante != null ? Number(variant.costo_variante) : undefined,
           estado: variant.estado ?? 'activo',
           id_insumo: variant.id_insumo,
+          cantidad_insumo: variant.cantidad_insumo != null ? Number(variant.cantidad_insumo) : undefined,
         }));
 
-      if (variantesNormalizadas.some((variant) => variant.precio_variante < 0)) {
-        message.error('El precio de una variante no puede ser negativo');
-        return;
-      }
-
-      if (variantesNormalizadas.some((variant) => (variant.costo_variante ?? 0) < 0)) {
-        message.error('El costo de una variante no puede ser negativo');
+      if (variantesNormalizadas.some((variant) => (variant.cantidad_insumo ?? 0) < 0)) {
+        message.error('La cantidad de insumo no puede ser negativa');
         return;
       }
 
@@ -663,7 +660,7 @@ export default function ProductosPage() {
                 className="h-11 rounded-xl px-4 text-base font-semibold text-white flex items-center gap-2 bg-green-800 hover:bg-green-900"
               >
                 <PiMoneyBold />
-                Gestión Gastos Operativo
+                Categorias Productos
               </button>
             )}
             {canManageProductos && (
@@ -951,7 +948,7 @@ export default function ProductosPage() {
                         {showView.receta.map((it, i) => (
                           <li key={`${it.id_insumo}-${i}`}>
                             {it.insumo?.nombre || "Insumo desconocido"} — {it.cantidad_insumo} {it.unidad_medida}
-                            {it.es_obligatorio ? " (obligatorio)" : ""}
+                            {/* el campo 'obligatorio' ya no se muestra */}
                           </li>
                         ))}
                       </ul>
@@ -1127,6 +1124,7 @@ function ProductoModal({
         nombre_variante: "",
         precio_variante: 0,
         costo_variante: 0,
+        cantidad_insumo: 0,
         estado: 'activo',
         id_insumo: undefined,
       },
@@ -1258,10 +1256,11 @@ function ProductoModal({
           data.map((variant) => ({
             id_variante: variant.id_variante,
             nombre_variante: variant.nombre_variante,
-            precio_variante: variant.precio_variante,
+            precio_variante: variant.precio_variante ?? undefined,
             costo_variante: variant.costo_variante ?? undefined,
             estado: variant.estado ?? 'activo',
-            id_insumo: variant.id_insumo ?? undefined,  // Cargar id_insumo desde backend
+            id_insumo: variant.id_insumo ?? undefined,
+            cantidad_insumo: variant.cantidad_insumo ?? undefined,
           }))
         );
       } catch (error) {
@@ -1347,18 +1346,15 @@ function ProductoModal({
       .map((variant) => ({
         id_variante: variant.id_variante,
         nombre_variante: variant.nombre_variante.trim(),
-        precio_variante: Number(variant.precio_variante || 0),
+        precio_variante: variant.precio_variante != null ? Number(variant.precio_variante) : undefined,
         costo_variante: variant.costo_variante != null ? Number(variant.costo_variante) : undefined,
+        cantidad_insumo: variant.cantidad_insumo != null ? Number(variant.cantidad_insumo) : undefined,
         estado: variant.estado ?? 'activo',
         id_insumo: variant.id_insumo,
       }));
 
-    if (variantesNormalizadas.some((variant) => variant.precio_variante < 0)) {
-      return message.error("El precio de una variante no puede ser negativo");
-    }
-
-    if (variantesNormalizadas.some((variant) => (variant.costo_variante ?? 0) < 0)) {
-      return message.error("El costo de una variante no puede ser negativo");
+    if (variantesNormalizadas.some((variant) => (variant.cantidad_insumo ?? 0) < 0)) {
+      return message.error("La cantidad del insumo de una variante no puede ser negativa");
     }
 
     if (variantesNormalizadas.length > 0) {
@@ -1677,23 +1673,18 @@ function ProductoModal({
                           <input
                             type="number"
                             inputMode="decimal"
-                            value={variant.precio_variante ?? 0}
-                            onChange={(e) => updateVariant(index, 'precio_variante', Number(e.target.value || 0))}
-                            className="w-20 h-9 rounded-md border border-gray-200 px-2 text-sm text-right"
-                            placeholder="Precio"
-                          />
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={variant.costo_variante ?? 0}
-                            onChange={(e) => updateVariant(index, 'costo_variante', Number(e.target.value || 0))}
-                            className="w-20 h-9 rounded-md border border-gray-200 px-2 text-sm text-right"
-                            placeholder="Costo"
+                            step="0.01"
+                            min="0"
+                            value={variant.cantidad_insumo ?? 0}
+                            onChange={(e) => updateVariant(index, 'cantidad_insumo', Number(e.target.value || 0))}
+                            className="w-20 h-9 rounded-md border border-gray-200 px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            placeholder="Cant."
+                            title="Cantidad del insumo a descontar"
                           />
                           <select
                             value={variant.estado ?? 'activo'}
                             onChange={(e) => updateVariant(index, 'estado', e.target.value as 'activo' | 'desactivado')}
-                            className="w-28 h-9 rounded-md border border-gray-200 px-2 text-sm"
+                            className="w-24 h-9 rounded-md border border-gray-200 px-2 text-sm"
                           >
                             <option value="activo">Activo</option>
                             <option value="desactivado">Desactivado</option>
@@ -1844,7 +1835,7 @@ function InlineRecipeEditor({
         id_insumo: 0, // 0 indica 'sin seleccionar'
         cantidad_insumo: 1,
         unidad_medida: "",
-        es_obligatorio: true,
+        // es_obligatorio removed from UI; default = NOT selected (false)
         insumo: { nombre: "", costo_promedio: 0 }
       },
     ]);
@@ -1937,14 +1928,7 @@ function InlineRecipeEditor({
                 readOnly
                 className="w-16 h-9 rounded-md border border-gray-200 px-2 text-sm bg-gray-50"
               />
-              <label className="flex items-center gap-1 text-xs">
-                <input
-                  type="checkbox"
-                  checked={l.es_obligatorio}
-                  onChange={(e) => updateLinea(index, "es_obligatorio", e.target.checked)}
-                />
-                Oblig.
-              </label>
+              {/* 'Oblig.' checkbox removed per new requirement - lines are NOT obligatory by default */}
               <button
                 type="button"
                 onClick={() => removeLinea(index)}
@@ -2008,7 +1992,7 @@ function RecetarioModal({
             id_insumo: detalle.id_insumo,
             cantidad_insumo: detalle.cantidad_requerida,
             unidad_medida: detalle.unidad_base,
-            es_obligatorio: true,
+            // es_obligatorio removed: default NOT obligatory (false)
             insumo: insumo
               ? { nombre: insumo.nombre, costo_promedio: insumo.costo_promedio }
               : undefined,
@@ -2062,7 +2046,7 @@ function RecetarioModal({
         id_insumo: primerInsumo.id_insumo,
         cantidad_insumo: 1,
         unidad_medida: primerInsumo.unidad_medida_compra || 'u',
-        es_obligatorio: true,
+        // es_obligatorio removed: default NOT obligatory (false)
         insumo: { nombre: primerInsumo.nombre, costo_promedio: primerInsumo.costo_promedio },
       } as RecetaLinea,
     ]);
@@ -2209,14 +2193,7 @@ function RecetarioModal({
                             onChange={(e) => updateLinea(index, "unidad_medida", e.target.value)}
                             className="w-16 h-9 rounded-md border border-gray-200 px-2 text-sm"
                           />
-                          <label className="flex items-center gap-1 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={linea.es_obligatorio}
-                              onChange={(e) => updateLinea(index, "es_obligatorio", e.target.checked)}
-                            />
-                            Oblig.
-                          </label>
+                          {/* 'Oblig.' checkbox removed — líneas no son obligatorias por defecto */}
                           <IconBtn title="Eliminar" onClick={() => removeLinea(index)}>
                             <PiTrashBold className="h-4 w-4 text-red-500" />
                           </IconBtn>

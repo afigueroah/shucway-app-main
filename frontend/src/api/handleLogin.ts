@@ -20,15 +20,23 @@ export const handleLogin = async (
     if (response.data.success) {
       // Guardar el token JWT usando el sistema de storage optimizado
       const { token, refreshToken, user } = response.data.data;
-      console.log('Guardando token en storage optimizado:', token ? 'Token presente' : 'Token ausente');
+      
+      // Validar que el token sea un string válido
+      if (!token || typeof token !== 'string' || !token.trim()) {
+        console.error('Token inválido recibido del servidor:', token);
+        message.error('Error: Token inválido recibido del servidor');
+        return false;
+      }
+      
+      console.log('Guardando token en storage optimizado:', token.substring(0, 20) + '...');
       
       // Guardar en localStorage optimizado con expiración
-      localStore.set('access_token', token, { expires: 60 * 24 * 1 }); // 1 día
+      localStore.set('access_token', token.trim(), { expires: 60 * 24 * 1 }); // 1 día
       localStore.set('refreshToken', refreshToken, { expires: 60 * 24 * 30 }); // 30 días
       localStore.set('user', user, { expires: 60 * 24 * 7 }); // 7 días
 
       // También guardar en cookies para persistencia adicional
-      cookieStore.set('auth_session', JSON.stringify({ token, user }), {
+      cookieStore.set('auth_session', JSON.stringify({ token: token.trim(), user }), {
         expires: 60 * 24 * 1, // 1 día
         secure: true,
         sameSite: 'strict'

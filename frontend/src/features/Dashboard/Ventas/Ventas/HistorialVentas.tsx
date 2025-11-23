@@ -174,7 +174,6 @@ const HistorialVentas: React.FC = () => {
             <tr className="text-left border-b">
               <th className="p-3 text-sm cursor-pointer" onClick={() => { setSortBy('id'); setSortOrder(prev => (sortBy === 'id' && prev === 'asc') ? 'desc' : 'asc'); }}>#</th>
               <th className="p-3 text-sm cursor-pointer" onClick={() => { setSortBy('fecha'); setSortOrder(prev => (sortBy === 'fecha' && prev === 'asc') ? 'desc' : 'asc'); }}>Fecha</th>
-              <th className="p-3 text-sm">Productos</th>
               <th className="p-3 text-sm cursor-pointer" onClick={() => { setSortBy('total'); setSortOrder(prev => (sortBy === 'total' && prev === 'asc') ? 'desc' : 'asc'); }}>Total</th>
               <th className="p-3 text-sm">Método</th>
               <th className="p-3 text-sm">Acciones</th>
@@ -185,7 +184,6 @@ const HistorialVentas: React.FC = () => {
               <tr key={v.id_venta} className="border-b hover:bg-gray-50">
                 <td className="p-3 font-medium">{v.id_venta}</td>
                 <td className="p-3 text-sm">{new Date(v.fecha_venta).toLocaleString('es-ES', { timeZone: 'UTC' })}</td>
-                <td className="p-3">{v.productos || '—'}</td>
                 <td className="p-3 font-semibold">Q{(v.total_venta ?? 0).toFixed(2)}</td>
                 <td className="p-3">
                   <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100">
@@ -202,7 +200,7 @@ const HistorialVentas: React.FC = () => {
               </tr>
             ))}
             {displayedVentas.length === 0 && (
-              <tr><td colSpan={6} className="p-6 text-center text-gray-500">No hay ventas</td></tr>
+              <tr><td colSpan={5} className="p-6 text-center text-gray-500">No hay ventas</td></tr>
             )}
           </tbody>
         </table>

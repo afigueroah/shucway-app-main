@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MdReceiptLong, MdInventory2, MdAccountBalance, MdError } from "react-icons/md";
-import { Package, Utensils, Coffee, Pizza, Sandwich, Cookie, Banknote, CreditCard, Landmark, Users, TrendingUp, DollarSign } from "lucide-react";
+import { Package, Utensils, Coffee, Pizza, Sandwich, Cookie, Banknote, CreditCard, Landmark, Users, TrendingUp, DollarSign, Gift } from "lucide-react";
 import { ventasService, Venta, ProductoPopular } from "../../../../api/ventasService";
 import { useAlerts } from "../../../../hooks/useAlerts";
 import type { LucideIcon } from "lucide-react";
@@ -81,7 +81,7 @@ const metodoBadgeClass = (metodo: string) => {
     case "Efectivo":
       // #00B074 con hover un poco más oscuro
       return "bg-[#00B074] hover:brightness-95 text-white";
-    case "Tarjeta":
+    case "Cupón":
       // #C2E66E con texto #123 (== #112233)
       return "bg-[#C2E66E] hover:brightness-95 text-[#112233]";
     case "Transferencia":
@@ -96,8 +96,8 @@ const MetodoIcon: React.FC<{ metodo: string; className?: string }> = ({ metodo, 
   switch (metodo) {
     case "Efectivo":
       return <Banknote className={className} strokeWidth={2} />;
-    case "Tarjeta":
-      return <CreditCard className={className} strokeWidth={2} />;
+    case "Cupón":
+      return <Gift className={className} strokeWidth={2} />;
     case "Transferencia":
       return <Landmark className={className} strokeWidth={2} />;
     default:
@@ -304,7 +304,7 @@ const VentasDashboard: React.FC = () => {
       productos: venta.productos_resumen || venta.productos || 'Productos varios',
       total: venta.total_venta,
       metodo: venta.tipo_pago === 'Cash' ? 'Efectivo' :
-              venta.tipo_pago === 'Tarjeta' ? 'Tarjeta' :
+              venta.tipo_pago === 'Tarjeta' ? 'Cupón' :
               venta.tipo_pago === 'Transferencia' ? 'Transferencia' : 'Otro',
       fecha: venta.fecha_venta,
     }));
@@ -645,7 +645,7 @@ const VentasDashboard: React.FC = () => {
                 {showFilter && (
                   <div className="absolute z-20 mt-2 w-56 rounded-xl border border-gray-200 bg-white shadow-lg p-3">
                     <p className="text-xs font-semibold text-gray-500 mb-2">Método de pago</p>
-                    {(["Efectivo", "Tarjeta", "Transferencia"] as const).map((m) => (
+                    {(["Efectivo", "Transferencia", "Cupón"] as const).map((m) => (
                       <label key={m} className="flex items-center gap-2 py-1 text-sm cursor-pointer">
                         <input
                           type="checkbox"

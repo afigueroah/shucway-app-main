@@ -216,6 +216,7 @@ export class ProductosService {
         nombre_variante: variant.nombre_variante,
         precio_variante: variant.precio_variante,
         costo_variante: variant.costo_variante ?? null,
+        cantidad_insumo: variant.cantidad_insumo ?? null,
         estado: variant.estado ?? 'activo',
       }));
 
@@ -236,7 +237,6 @@ export class ProductosService {
         id_insumo: linea.id_insumo,
         cantidad_requerida: linea.cantidad_requerida,
         unidad_base: linea.unidad_base,
-        es_obligatorio: linea.es_obligatorio ?? true,
       }));
 
       await this.insertRecetaDetalles(productoId, recetaPayload);
@@ -292,6 +292,7 @@ export class ProductosService {
           nombre_variante: variant.nombre_variante,
           precio_variante: variant.precio_variante,
           costo_variante: variant.costo_variante ?? null,
+          cantidad_insumo: variant.cantidad_insumo ?? null,
           estado: variant.estado ?? 'activo',
         }));
 
@@ -321,7 +322,6 @@ export class ProductosService {
           id_insumo: linea.id_insumo,
           cantidad_requerida: linea.cantidad_requerida,
           unidad_base: linea.unidad_base,
-          es_obligatorio: linea.es_obligatorio ?? true,
         }));
 
         await this.insertRecetaDetalles(id, recetaPayload);
@@ -381,7 +381,6 @@ export class ProductosService {
       id_insumo: detalle.id_insumo,
       cantidad_requerida: detalle.cantidad_requerida,
       unidad_base: detalle.unidad_base,
-      es_obligatorio: detalle.es_obligatorio ?? true,
     }));
 
     const { error: insertError } = await supabase.from('receta_detalle').insert(payloadWithIds);

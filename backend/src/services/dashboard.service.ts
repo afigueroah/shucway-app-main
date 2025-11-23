@@ -151,6 +151,7 @@ export const dashboardService = {
     return [
       'rol_usuario',
       'perfil_usuario',
+      'bitacora_seguridad',
       'categoria_insumo',
       'proveedor',
       'insumo',
@@ -171,6 +172,9 @@ export const dashboardService = {
       'gasto_operativo',
       'arqueo_caja',
       'historial_puntos',
+      'auditoria_inventario',
+      'auditoria_detalle',
+      'bitacora_auditoria',
       'bitacora_inventario',
       'bitacora_ventas',
       'bitacora_ordenes_compra',

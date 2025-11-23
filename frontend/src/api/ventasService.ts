@@ -251,7 +251,7 @@ export const ventasService = {
   },
 
   // Actualizar estado de transferencia
-  async updateEstadoTransferencia(idVenta: number, data: { estado: 'esperando' | 'recibido' }): Promise<void> {
+  async updateEstadoTransferencia(idVenta: number, data: { estado?: 'esperando' | 'recibido'; numero_referencia?: string; nombre_banco?: string }): Promise<void> {
     try {
       await apiClient.put(`/ventas/${idVenta}/transferencia`, data);
     } catch (error) {

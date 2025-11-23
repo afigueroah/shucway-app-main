@@ -31,8 +31,9 @@ export interface ProductoVariante {
   id_producto: number;
   id_insumo?: number;  // Insumo asociado a esta variante (opcional)
   nombre_variante: string;
-  precio_variante: number;
+  precio_variante?: number;
   costo_variante?: number;
+  cantidad_insumo?: number;  // Cantidad del insumo a descontar
   estado: 'activo' | 'desactivado';
 }
 
@@ -43,7 +44,7 @@ export interface RecetaDetalle {
   id_insumo: number;
   cantidad_requerida: number;
   unidad_base: string;
-  es_obligatorio?: boolean;
+  // es_obligatorio removed from API surface - recipe lines are NOT obligatory by default
 }
 
 export interface ProductoConReceta extends Producto {

@@ -436,6 +436,30 @@ const CierreCaja: React.FC = () => {
     }
   };
 
+  const handleUpdateTransferencia = async (idVenta: number, referencia: string, banco: string) => {
+    try {
+      await ventasService.updateEstadoTransferencia(idVenta, { numero_referencia: referencia, nombre_banco: banco });
+
+      // Actualizar el estado local
+      setTransferencias(prev => prev.map(t =>
+        t.id_venta === idVenta
+          ? {
+              ...t,
+              deposito_banco: {
+                ...t.deposito_banco,
+                numero_referencia: referencia,
+                nombre_banco: banco
+              }
+            }
+          : t
+      ));
+
+    } catch (error) {
+      console.error('Error al actualizar detalles de transferencia:', error);
+      throw error; // Para que el componente lo maneje
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="w-full max-w-[1200px] mx-auto">
@@ -696,6 +720,7 @@ const CierreCaja: React.FC = () => {
           transferencias={transferencias}
           loadingTransferencias={loadingTransferencias}
           onUpdateEstado={handleUpdateEstadoTransferencia}
+          onUpdateTransferencia={handleUpdateTransferencia}
         />
 
         {/* ===== Modal de Reporte (optimizado PDF) ===== */}
@@ -928,7 +953,7 @@ function ArqueoDrawer({
   totalArqueo: number;
   onClear: () => void;
   onApply: () => void;
-}) {
+}): JSX.Element {
   return (
     <AnimatePresence>
       {open && (
@@ -953,10 +978,10 @@ function ArqueoDrawer({
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800">Arqueo de caja</h3>
-                <p className="text-xs text-gray-500">Ingresa la cantidad de billetes/monedas por denominaci??n (Q)</p>
+                <p className="text-xs text-gray-500">Ingresa la cantidad de billetes/monedas por cantidad (Q)</p>
               </div>
               <button onClick={onClose} className="px-3 py-1 rounded-md border bg-gray-50 hover:bg-gray-100 text-sm">
-                ???
+                X
               </button>
             </div>
 
@@ -969,7 +994,7 @@ function ArqueoDrawer({
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-600">
                       <tr>
-                        <th className="px-4 py-2 text-left">Denominaci??n</th>
+                        <th className="px-4 py-2 text-left">Monto</th>
                         <th className="px-4 py-2 text-right">Cant</th>
                         <th className="px-4 py-2 text-right">Total</th>
                       </tr>
@@ -1038,14 +1063,19 @@ function TransferDrawer({
   transferencias,
   loadingTransferencias,
   onUpdateEstado,
+  onUpdateTransferencia,
 }: {
   open: boolean;
   onClose: () => void;
   transferencias: Venta[]; // Ventas con tipo_pago = 'Transferencia'
   loadingTransferencias: boolean;
   onUpdateEstado: (idVenta: number, estado: 'esperando' | 'recibido') => Promise<void>;
-}) {
+  onUpdateTransferencia: (idVenta: number, referencia: string, banco: string) => Promise<void>;
+}): JSX.Element {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editReferencia, setEditReferencia] = useState('');
+  const [editBanco, setEditBanco] = useState('');
 
   const handleUpdateEstado = async (idVenta: number, estado: 'esperando' | 'recibido') => {
     setUpdatingId(idVenta);
@@ -1056,6 +1086,31 @@ function TransferDrawer({
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const handleEditTransferencia = (venta: VentaTransferencia) => {
+    setEditingId(venta.id_venta);
+    setEditReferencia(venta.deposito_banco?.numero_referencia || '');
+    setEditBanco(venta.deposito_banco?.nombre_banco || '');
+  };
+
+  const handleSaveTransferencia = async () => {
+    if (editingId === null) return;
+    setUpdatingId(editingId);
+    try {
+      await onUpdateTransferencia(editingId, editReferencia, editBanco);
+      setEditingId(null);
+    } catch (error) {
+      console.error('Error al actualizar transferencia:', error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditReferencia('');
+    setEditBanco('');
   };
 
   return (
@@ -1140,65 +1195,127 @@ function TransferDrawer({
                             <span>{venta.cliente.nombre || 'Sin nombre'}</span>
                           </div>
                         )}
-                        {venta.deposito_banco?.numero_referencia && (
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <FaHashtag className="w-4 h-4 text-gray-400" />
-                            <span className="font-medium">Referencia:</span>
-                            <span>{venta.deposito_banco.numero_referencia}</span>
+                        {editingId === venta.id_venta ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <FaHashtag className="w-4 h-4 text-gray-400" />
+                              <span className="font-medium">Referencia:</span>
+                              <input
+                                type="text"
+                                value={editReferencia}
+                                onChange={(e) => setEditReferencia(e.target.value)}
+                                className="flex-1 border rounded px-2 py-1 text-sm"
+                                placeholder="Número de referencia"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <FaUniversity className="w-4 h-4 text-gray-400" />
+                              <span className="font-medium">Banco:</span>
+                              <input
+                                type="text"
+                                value={editBanco}
+                                onChange={(e) => setEditBanco(e.target.value)}
+                                className="flex-1 border rounded px-2 py-1 text-sm"
+                                placeholder="Nombre del banco"
+                              />
+                            </div>
                           </div>
-                        )}
-                        {venta.deposito_banco?.nombre_banco && (
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <FaUniversity className="w-4 h-4 text-gray-400" />
-                            <span className="font-medium">Banco:</span>
-                            <span>{venta.deposito_banco.nombre_banco}</span>
-                          </div>
+                        ) : (
+                          <>
+                            {venta.deposito_banco?.numero_referencia && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <FaHashtag className="w-4 h-4 text-gray-400" />
+                                <span className="font-medium">Referencia:</span>
+                                <span>{venta.deposito_banco.numero_referencia}</span>
+                              </div>
+                            )}
+                            {venta.deposito_banco?.nombre_banco && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <FaUniversity className="w-4 h-4 text-gray-400" />
+                                <span className="font-medium">Banco:</span>
+                                <span>{venta.deposito_banco.nombre_banco}</span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
 
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleUpdateEstado(venta.id_venta, 'recibido')}
-                          disabled={updatingId === venta.id_venta || venta.estado_transferencia === 'recibido'}
-                          className={`flex-1 h-9 rounded-md text-sm font-medium ${
-                            venta.estado_transferencia === 'recibido'
-                              ? 'bg-green-100 text-green-700 cursor-not-allowed'
-                              : 'bg-green-500 text-white hover:bg-green-600'
-                          }`}
-                        >
-                          {updatingId === venta.id_venta ? (
-                            <svg className="animate-spin w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                            </svg>
-                          ) : (
-                            <div className="flex items-center justify-center gap-2">
-                              <FaCheck className="w-4 h-4" />
-                              <span>RECIBIDO</span>
-                            </div>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleUpdateEstado(venta.id_venta, 'esperando')}
-                          disabled={updatingId === venta.id_venta || venta.estado_transferencia === 'esperando'}
-                          className={`flex-1 h-9 rounded-md text-sm font-medium ${
-                            venta.estado_transferencia === 'esperando'
-                              ? 'bg-amber-100 text-amber-700 cursor-not-allowed'
-                              : 'bg-amber-500 text-white hover:bg-amber-600'
-                          }`}
-                        >
-                          {updatingId === venta.id_venta ? (
-                            <svg className="animate-spin w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                            </svg>
-                          ) : (
-                            <div className="flex items-center justify-center gap-2">
-                              <FaClock className="w-4 h-4" />
-                              <span>ESPERANDO</span>
-                            </div>
-                          )}
-                        </button>
+                        {editingId === venta.id_venta ? (
+                          <>
+                            <button
+                              onClick={handleSaveTransferencia}
+                              disabled={updatingId === venta.id_venta}
+                              className="flex-1 h-9 rounded-md text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+                            >
+                              {updatingId === venta.id_venta ? (
+                                <svg className="animate-spin w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                </svg>
+                              ) : (
+                                'Guardar'
+                              )}
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="flex-1 h-9 rounded-md text-sm font-medium bg-gray-500 text-white hover:bg-gray-600"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleEditTransferencia(venta)}
+                              className="flex-1 h-9 rounded-md text-sm font-medium bg-purple-500 text-white hover:bg-purple-600"
+                            >
+                              Editar Datos
+                            </button>
+                            <button
+                              onClick={() => handleUpdateEstado(venta.id_venta, 'recibido')}
+                              disabled={updatingId === venta.id_venta || venta.estado_transferencia === 'recibido'}
+                              className={`flex-1 h-9 rounded-md text-sm font-medium ${
+                                venta.estado_transferencia === 'recibido'
+                                  ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                                  : 'bg-green-500 text-white hover:bg-green-600'
+                              }`}
+                            >
+                              {updatingId === venta.id_venta ? (
+                                <svg className="animate-spin w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                </svg>
+                              ) : (
+                                <div className="flex items-center justify-center gap-2">
+                                  <FaCheck className="w-4 h-4" />
+                                  <span>RECIBIDO</span>
+                                </div>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleUpdateEstado(venta.id_venta, 'esperando')}
+                              disabled={updatingId === venta.id_venta || venta.estado_transferencia === 'esperando'}
+                              className={`flex-1 h-9 rounded-md text-sm font-medium ${
+                                venta.estado_transferencia === 'esperando'
+                                  ? 'bg-amber-100 text-amber-700 cursor-not-allowed'
+                                  : 'bg-amber-500 text-white hover:bg-amber-600'
+                              }`}
+                            >
+                              {updatingId === venta.id_venta ? (
+                                <svg className="animate-spin w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                </svg>
+                              ) : (
+                                <div className="flex items-center justify-center gap-2">
+                                  <FaClock className="w-4 h-4" />
+                                  <span>ESPERANDO</span>
+                                </div>
+                              )}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1250,7 +1367,7 @@ function ReportModal({
   fechaApertura?: string;
   titulo?: string;
   ventasEfectivo: number;
-}) {
+}): JSX.Element {
   const fechaCierre = useMemo(
     () =>
       new Intl.DateTimeFormat("es-GT", {
@@ -1456,7 +1573,7 @@ function ReportModal({
   );
 };
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+function SectionHeading({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <div className="flex items-center gap-2 mb-2">
       <div className="h-5 w-1.5 rounded bg-emerald-600" />
@@ -1465,7 +1582,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }): JSX.Element {
   return (
     <div className="grid grid-cols-[1fr_auto] gap-4 py-1 text-sm">
       <div className="text-gray-600">{label}</div>
@@ -1502,7 +1619,7 @@ function PrintableSheet({
   fechaApertura?: string;
   fechaCierre: string;
   ventasEfectivo: number;
-}) {
+}): JSX.Element {
   return (
     <div className="sheet mx-auto bg-white rounded-xl border shadow-sm p-8">
       {/* Header */}

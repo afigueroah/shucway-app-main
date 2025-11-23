@@ -341,7 +341,7 @@ export class VentasController {
   async updateEstadoTransferencia(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const idVenta = parseInt(req.params.id);
-      const { estado } = req.body as { estado: 'esperando' | 'recibido' };
+      const { estado, numero_referencia, nombre_banco } = req.body as { estado?: 'esperando' | 'recibido'; numero_referencia?: string; nombre_banco?: string };
 
       if (isNaN(idVenta) || idVenta <= 0) {
         res.status(400).json({
@@ -351,7 +351,7 @@ export class VentasController {
         return;
       }
 
-      if (!estado || !['esperando', 'recibido'].includes(estado)) {
+      if (estado && !['esperando', 'recibido'].includes(estado)) {
         res.status(400).json({
           success: false,
           message: 'Estado inválido. Debe ser "esperando" o "recibido"',
@@ -359,11 +359,11 @@ export class VentasController {
         return;
       }
 
-      await ventasService.updateEstadoTransferencia(idVenta, estado);
+      await ventasService.updateEstadoTransferencia(idVenta, { estado, numero_referencia, nombre_banco });
 
       res.json({
         success: true,
-        message: `Estado de transferencia actualizado a ${estado}`,
+        message: `Estado/detalles de transferencia actualizados`,
       });
     } catch (error) {
       next(error);

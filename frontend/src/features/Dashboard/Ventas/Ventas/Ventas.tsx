@@ -620,7 +620,8 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
         nombre,
         id_insumo: linea.id_insumo,
         variantId: linea.id_variante ?? null,
-        esObligatorio: linea.es_obligatorio ?? true,
+        // es_obligatorio - default NOT obligatory (false)
+        esObligatorio: linea.es_obligatorio ?? false,
         imagenUrl,
         stockActual,
         cantidadRequerida,
@@ -634,9 +635,8 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
         continue;
       }
 
-      if (modsParsed) {
-        checks[option.key] = !omitidos.has(normalizeText(option.nombre));
-      } else if (previousChecks && option.key in previousChecks) {
+      // Default behaviour: selected by default unless there are previous checks (editing state).
+      if (previousChecks && option.key in previousChecks) {
         checks[option.key] = previousChecks[option.key];
       } else {
         checks[option.key] = true;
@@ -731,7 +731,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
     if (!customProd) return;
 
     const faltantes = ingredientOptions.filter((option) => {
-      const seleccionado = option.esObligatorio || (customChecks[option.key] ?? true);
+      const seleccionado = option.esObligatorio || (customChecks[option.key] ?? false);
       if (!seleccionado) return false;
       if (option.stockActual == null) return false;
       const requerido = option.cantidadRequerida * customQty;
@@ -1129,7 +1129,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
       const omitidosSet = new Set(parsedMods.sin.map(normalizeText));
 
       for (const linea of lineas) {
-        const esObligatorio = linea.es_obligatorio !== false;
+        const esObligatorio = linea.es_obligatorio === true; // default NOT obligatory unless explicitly true
         const insumo = insumos.find((i) => i.id_insumo === linea.id_insumo);
         const nombre = insumo?.nombre_insumo ?? `Insumo ${linea.id_insumo}`;
         const seleccionado = esObligatorio || !omitidosSet.has(normalizeText(nombre));
@@ -1197,8 +1197,8 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
   const confirmarPago = async () => {
     if (!carrito.length) return addNotification({ type: 'warning', title: 'Carrito vacío', message: 'Tu carrito está vacío.' });
 
-    if (metodo === 'transferencia' && (!referencia.trim() || !banco.trim() || !clienteSeleccionado)) {
-      setPagoError('Ingresa número de referencia, banco de origen y selecciona un cliente.');
+    if (metodo === 'transferencia' && !clienteSeleccionado) {
+      setPagoError('Selecciona un cliente para pagos con transferencia.');
       setTransfInvalid(true);
       setCashInvalid(false);
       return;
@@ -1247,8 +1247,8 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
         })),
         // Agregar información de transferencia si es el método seleccionado
         ...(metodo === 'transferencia' && {
-          numero_referencia: referencia.trim(),
-          nombre_banco: banco.trim()
+          numero_referencia: referencia.trim() || 'Sin referencia',
+          nombre_banco: banco.trim() || 'Sin banco'
         }),
       };
 
@@ -1282,7 +1282,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
         total,
         metodo, // 'efectivo' | 'transferencia'
         efectivo: metodo === 'efectivo' ? { dineroRecibido: recibido, cambio: cambioLocal } : null,
-        transferencia: metodo === 'transferencia' ? { referencia, banco } : null,
+        transferencia: metodo === 'transferencia' ? { referencia: referencia || 'Sin referencia', banco: banco || 'Sin banco' } : null,
         fechaHora: new Date().toISOString(),
         notas: notasVenta.trim() || undefined,
       };
@@ -1356,6 +1356,16 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
   const confirmarCanjeGratis = async () => {
     if (!carrito.length) return addNotification({ type: 'warning', title: 'Carrito vacío', message: 'Tu carrito está vacío.' });
 
+    // Verificar si el sistema de puntos está activado
+    if (!puntosEnabled) {
+      addNotification({
+        type: 'warning',
+        title: 'Sistema de puntos desactivado',
+        message: 'El sistema de puntos está desactivado. El canje gratis se procesará sin usar puntos.',
+        duration: 3000,
+      });
+    }
+
     // Setting metodo to canje_gratis to ensure UI hides cash inputs
     setMetodo('canje_gratis');
     setDineroRecibido('');
@@ -1372,15 +1382,15 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
         tipo_pago: 'Canje',
         acumula_puntos: puntosEnabled,
         notas: notasVenta.trim() ? `${notasVenta.trim()} - CANJE GRATIS` : 'CANJE GRATIS',
-        puntos_usados: carrito.reduce((sum, it) => sum + (10 * it.qty), 0),
+        puntos_usados: puntosEnabled ? carrito.reduce((sum, it) => sum + (10 * it.qty), 0) : 0,
         detalles: carrito.map((item) => ({
           id_producto: item.producto.id_producto,
           id_variante: item.id_variante,
           cantidad: item.qty,
           precio_unitario: 0, // Precio 0 para canje gratis
           descuento: 0,
-          es_canje_puntos: true,
-          puntos_canjeados: 10 * item.qty,
+          es_canje_puntos: puntosEnabled,
+          puntos_canjeados: puntosEnabled ? 10 * item.qty : 0,
         })),
       };
 
@@ -2078,8 +2088,11 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                     Cancelar
                   </button>
                   <button
-                    onClick={() => setConfirmCanje(true)}
-                    disabled={!carrito.length || !puntosEnabled || clienteSeleccionado?.puntos_acumulados === 9}
+                    onClick={() => {
+                      console.log('Canje Gratis clicked - carrito:', carrito.length, 'puntosEnabled:', puntosEnabled, 'cliente puntos:', clienteSeleccionado?.puntos_acumulados);
+                      setConfirmCanje(true);
+                    }}
+                    disabled={!carrito.length}
                     className="h-12 rounded-lg bg-purple-600 text-white font-semibold text-base hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     <Gift size={18} />

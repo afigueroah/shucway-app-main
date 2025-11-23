@@ -31,6 +31,9 @@ export const authenticateToken = (
           token ? 'Presente (primeros 20 chars): ' + token.substring(0, 20) + '...' : 'Ausente'
         }`
       );
+      if (token) {
+        logger.info(`🔍 Token Length: ${token.length}`);
+      }
     }
 
     if (!token) {
@@ -65,7 +68,8 @@ export const authenticateToken = (
       next();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'verify error';
-      logger.warn(`❌ Token inválido: ${errorMessage}`);
+      logger.warn(`❌ Token inválido: ${errorMessage} - Path: ${req.path}`);
+      logger.warn(`❌ Token recibido: ${token ? token.substring(0, 50) + '...' : 'null'}`);
       res.status(403).json({
         success: false,
         error: 'Token inválido o expirado',
