@@ -80,10 +80,6 @@ const ArqueoCaja: React.FC = () => {
   }, [loadArqueos]);
 
   useEffect(() => {
-    loadArqueos();
-  }, [loadArqueos]);
-
-  useEffect(() => {
     setCurrentPage(1);
   }, [pageSize]);
 
@@ -94,19 +90,18 @@ const ArqueoCaja: React.FC = () => {
       // Usar transferencias del arqueo
       const transferencias = arqueo.transferencias || [];
 
-      // Cargar otros datos
+      // Cargar ventas del día del arqueo para el reporte detallado
       const fechaDia = arqueo.fecha_arqueo.split('T')[0];
       const fechaInicio = fechaDia + ' 00:00:00';
       const fechaFin = fechaDia + ' 23:59:59';
 
-      const result = await ventasService.getTotalVentasSesion(fechaInicio);
       const ventas = await ventasService.getVentas('confirmada', fechaInicio, fechaFin);
 
       setReporteData({
         ventas,
         transferencias,
-        ventasTotales: result.total,
-        ventasEfectivo: result.efectivo,
+        ventasTotales: arqueo.total_sistema, // Usar el total almacenado en el arqueo
+        ventasEfectivo: arqueo.total_sistema, // Usar el total almacenado en el arqueo
         transferTotal: transferencias.reduce((sum, t) => sum + (t.monto || 0), 0),
       });
     } catch (error) {
@@ -213,6 +208,8 @@ const ArqueoCaja: React.FC = () => {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Arqueo</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apertura</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cierre</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Contado</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sistema</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Diferencia</th>
@@ -225,6 +222,12 @@ const ArqueoCaja: React.FC = () => {
               <tr key={arqueo.id_arqueo}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{arqueo.id_arqueo}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(arqueo.fecha_arqueo).toLocaleDateString()}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {arqueo.fecha_apertura ? new Date(arqueo.fecha_apertura).toLocaleString() : 'N/A'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {arqueo.fecha_cierre ? new Date(arqueo.fecha_cierre).toLocaleString() : 'N/A'}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Q{arqueo.total_contado?.toFixed(2)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Q{arqueo.total_sistema?.toFixed(2)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Q{arqueo.diferencia?.toFixed(2)}</td>
@@ -451,6 +454,8 @@ function PrintableArqueoSheet({
         <Row label="ID Arqueo" value={String(arqueo.id_arqueo)} />
         <Row label="ID Cajero" value={String(arqueo.id_cajero || 'N/A')} />
         <Row label="Fecha Arqueo" value={fechaArqueo} />
+        <Row label="Fecha Apertura" value={arqueo.fecha_apertura ? new Date(arqueo.fecha_apertura).toLocaleString() : 'N/A'} />
+        <Row label="Fecha Cierre" value={arqueo.fecha_cierre ? new Date(arqueo.fecha_cierre).toLocaleString() : 'N/A'} />
         <Row label="Estado" value={arqueo.estado} />
         <Row label="Total Sistema" value={`Q${arqueo.total_sistema.toFixed(2)}`} />
         <Row label="Total Contado" value={`Q${arqueo.total_contado.toFixed(2)}`} />

@@ -22,6 +22,8 @@ export interface Cliente {
   fecha_registro: Date;
   puntos_acumulados: number;
   ultima_compra?: Date;
+  tiene_transferencias_pendientes?: boolean;
+  cantidad_transferencias_pendientes?: number;
 }
 
 export const clientesService = {
@@ -112,6 +114,17 @@ export const clientesService = {
       return response.data.data;
     } catch (error) {
       console.error('Error obteniendo producto favorito:', error);
+      throw error;
+    }
+  },
+
+  // Obtener transferencias pendientes de un cliente
+  async getTransferenciasPendientes(idCliente: number): Promise<any[]> {
+    try {
+      const response = await apiClient.get(`/clientes/${idCliente}/transferencias-pendientes`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error obteniendo transferencias pendientes:', error);
       throw error;
     }
   },

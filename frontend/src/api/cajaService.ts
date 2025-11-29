@@ -39,6 +39,9 @@ export interface Arqueo {
   transferencias: any[]; // Lista de transferencias
   observaciones: string | null;
   estado: 'abierto' | 'cerrado' | 'revisado';
+  // Información de la sesión de caja
+  fecha_apertura?: string;
+  fecha_cierre?: string;
 }
 
 export interface CajaEstado {

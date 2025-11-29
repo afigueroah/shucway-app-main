@@ -90,11 +90,10 @@ class CajaService {
     return this.toCajaSesion(data);
   }
 
-  private async crearArqueoAutomatico(session: CajaSesion, fechaCierre: string): Promise<void> {
-    const fechaArqueo = new Date(fechaCierre).toISOString().split('T')[0];
+  private async crearArqueoManual(session: CajaSesion, dto: CerrarCajaDTO): Promise<void> {
+    const fechaArqueo = new Date().toISOString().split('T')[0];
     
-    // Obtener total de ventas en efectivo para esa sesión (aproximado)
-    // Como no hay id_sesion en venta, usar fecha
+    // Calcular totales de ventas en efectivo para esa sesión
     const fechaDia = fechaArqueo;
     const { data: ventas, error: errorVentas } = await supabase
       .from('venta')
@@ -104,27 +103,49 @@ class CajaService {
       .lte('fecha_venta', fechaDia + ' 23:59:59');
 
     if (errorVentas) {
-      console.error('Error obteniendo ventas para arqueo automático:', errorVentas);
+      console.error('Error obteniendo ventas para arqueo manual:', errorVentas);
       return;
     }
 
     const totalEfectivo = ventas?.filter(v => v.tipo_pago === 'Cash').reduce((sum, v) => sum + Number(v.total_venta), 0) || 0;
     const transferencias = await this.getTransferenciasPorFecha(fechaArqueo);
 
-    // Insertar arqueo con total_contado = total_sistema (efectivo)
+    // Si no se proporcionaron datos del arqueo, usar valores por defecto
+    const totalContado = dto.monto_cierre || totalEfectivo;
+    const diferencia = totalContado - totalEfectivo;
+
+    // Insertar arqueo
     const { error } = await supabase
       .from('arqueo_caja')
       .insert({
         fecha_arqueo: fechaArqueo,
-        id_cajero: session.id_cajero_apertura,
+        id_cajero: session.id_cajero_cierre || session.id_cajero_apertura,
+        billetes_100: dto.arqueo?.billetes_100 || 0,
+        billetes_50: dto.arqueo?.billetes_50 || 0,
+        billetes_20: dto.arqueo?.billetes_20 || 0,
+        billetes_10: dto.arqueo?.billetes_10 || 0,
+        billetes_5: dto.arqueo?.billetes_5 || 0,
+        monedas_1: dto.arqueo?.monedas_1 || 0,
+        monedas_050: dto.arqueo?.monedas_050 || 0,
+        monedas_025: dto.arqueo?.monedas_025 || 0,
+        total_billetes_100: (dto.arqueo?.billetes_100 || 0) * 100,
+        total_billetes_50: (dto.arqueo?.billetes_50 || 0) * 50,
+        total_billetes_20: (dto.arqueo?.billetes_20 || 0) * 20,
+        total_billetes_10: (dto.arqueo?.billetes_10 || 0) * 10,
+        total_billetes_5: (dto.arqueo?.billetes_5 || 0) * 5,
+        total_monedas_1: (dto.arqueo?.monedas_1 || 0) * 1,
+        total_monedas_050: (dto.arqueo?.monedas_050 || 0) * 0.5,
+        total_monedas_025: (dto.arqueo?.monedas_025 || 0) * 0.25,
+        total_contado: totalContado,
         total_sistema: totalEfectivo,
+        diferencia: diferencia,
         transferencias: transferencias,
-        observaciones: 'Arqueo automático por cierre expirado',
+        observaciones: dto.observaciones || 'Arqueo automático al cerrar caja',
         estado: 'cerrado'
       });
 
     if (error) {
-      console.error('Error creando arqueo automático:', error);
+      console.error('Error creando arqueo manual:', error);
     }
   }
 
@@ -197,7 +218,12 @@ class CajaService {
       throw new AppError(error?.message ?? 'No se pudo cerrar la caja.', 500);
     }
 
-    return this.toCajaSesion(data);
+    const sesionCerrada = this.toCajaSesion(data);
+
+    // Crear arqueo automático al cerrar la caja manualmente
+    await this.crearArqueoManual(sesionCerrada, dto);
+
+    return sesionCerrada;
   }
 
   async requireCajaAbierta(idCajero: number): Promise<CajaSesion> {
@@ -217,7 +243,10 @@ class CajaService {
   async getArqueos(fechaInicio?: string, fechaFin?: string): Promise<Arqueo[]> {
     let query = supabase
       .from('arqueo_caja')
-      .select('*')
+      .select(`
+        *,
+        caja_sesion!left(fecha_apertura, fecha_cierre)
+      `)
       .order('fecha_arqueo', { ascending: false });
 
     if (fechaInicio) {
@@ -240,6 +269,34 @@ class CajaService {
         transferencias = await this.getTransferenciasPorFecha(row.fecha_arqueo);
         // Opcional: actualizar la BD, pero por ahora solo en memoria
       }
+      
+      // Si no hay información de sesión, intentar buscarla por fecha y cajero
+      let fecha_apertura = row.caja_sesion?.fecha_apertura;
+      let fecha_cierre = row.caja_sesion?.fecha_cierre;
+      
+      if (!fecha_apertura && row.id_cajero) {
+        // Buscar sesión por cajero y fecha aproximada
+        const fechaArqueo = new Date(row.fecha_arqueo);
+        const fechaInicio = new Date(fechaArqueo);
+        fechaInicio.setHours(0, 0, 0, 0);
+        const fechaFin = new Date(fechaArqueo);
+        fechaFin.setHours(23, 59, 59, 999);
+        
+        const { data: sesiones } = await supabase
+          .from('caja_sesion')
+          .select('fecha_apertura, fecha_cierre')
+          .eq('id_cajero_apertura', row.id_cajero)
+          .gte('fecha_apertura', fechaInicio.toISOString())
+          .lte('fecha_apertura', fechaFin.toISOString())
+          .order('fecha_apertura', { ascending: false })
+          .limit(1);
+          
+        if (sesiones && sesiones.length > 0) {
+          fecha_apertura = sesiones[0].fecha_apertura;
+          fecha_cierre = sesiones[0].fecha_cierre;
+        }
+      }
+      
       return {
         id_arqueo: row.id_arqueo,
         fecha_arqueo: row.fecha_arqueo,
@@ -266,6 +323,8 @@ class CajaService {
         transferencias,
         observaciones: row.observaciones,
         estado: row.estado,
+        fecha_apertura,
+        fecha_cierre,
       };
     }));
 

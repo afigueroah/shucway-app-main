@@ -186,6 +186,18 @@ export class ClientesController {
       next(error);
     }
   }
-}
 
-export const clientesController = new ClientesController();
+  async getTransferenciasPendientes(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id);
+      const transferencias = await clientesService.getTransferenciasPendientes(id);
+
+      res.json({
+        success: true,
+        data: transferencias,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+}

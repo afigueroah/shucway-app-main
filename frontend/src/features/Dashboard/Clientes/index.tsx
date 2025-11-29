@@ -13,12 +13,14 @@ import {
   Minus,
   RefreshCw,
   Search,
+  UserX,
   Trash2,
   Users,
   X,
   Star,
 } from "lucide-react";
 import { clientesService, type Cliente } from "../../../api/clientesService";
+import { ventasService } from "../../../api/ventasService";
 import { localStore } from "../../../utils/storage";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
@@ -74,6 +76,10 @@ export default function Clientes() {
   const [procesandoPuntos, setProcesandoPuntos] = useState(false);
   const [favoriteProduct, setFavoriteProduct] = useState<{ producto: string; cantidad: number } | null>(null);
   const [puntosEnabled, setPuntosEnabled] = useState(() => localStore.get('puntosEnabled', false));
+  const [deudasModalOpen, setDeudasModalOpen] = useState(false);
+  const [clienteDeudas, setClienteDeudas] = useState<Cliente | null>(null);
+  const [transferenciasPendientes, setTransferenciasPendientes] = useState<any[]>([]);
+  const [cargandoDeudas, setCargandoDeudas] = useState(false);
 
   useEffect(() => {
     loadData(true);
@@ -248,6 +254,39 @@ export default function Clientes() {
     setCantidadPuntos(cliente.puntos_acumulados);
     setMotivoPuntos('');
     setPuntosModalOpen(true);
+  };
+
+  const openDeudasModal = async (cliente: Cliente) => {
+    setClienteDeudas(cliente);
+    setCargandoDeudas(true);
+    setDeudasModalOpen(true);
+
+    try {
+      const transferencias = await clientesService.getTransferenciasPendientes(cliente.id_cliente);
+      setTransferenciasPendientes(transferencias);
+    } catch (error) {
+      console.error('Error obteniendo transferencias pendientes:', error);
+      message.error('Error al cargar las deudas del cliente');
+      setTransferenciasPendientes([]);
+    } finally {
+      setCargandoDeudas(false);
+    }
+  };
+
+  const eliminarDeuda = async (transferencia: any) => {
+    try {
+      await ventasService.updateEstadoTransferencia(transferencia.id_venta, { estado: 'recibido' });
+      message.success('Deuda marcada como pagada');
+      
+      // Recargar las deudas
+      if (clienteDeudas) {
+        const transferencias = await clientesService.getTransferenciasPendientes(clienteDeudas.id_cliente);
+        setTransferenciasPendientes(transferencias);
+      }
+    } catch (error) {
+      console.error('Error eliminando deuda:', error);
+      message.error('Error al marcar la deuda como pagada');
+    }
   };
 
   const openEditDrawer = (cliente: Cliente) => {
@@ -676,6 +715,15 @@ export default function Clientes() {
                         >
                           <Star className="h-4 w-4" />
                         </button>
+                        {cliente.tiene_transferencias_pendientes && (
+                          <button
+                            onClick={() => openDeudasModal(cliente)}
+                            className="text-orange-600 hover:text-orange-900 p-1"
+                            title={`Ver deudas (${cliente.cantidad_transferencias_pendientes} pendiente(s))`}
+                          >
+                            <UserX className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => openEditDrawer(cliente)}
                           className="text-blue-600 hover:text-blue-900 p-1"
@@ -1222,6 +1270,120 @@ export default function Clientes() {
             </motion.div>
           </motion.div>
         )}
+
+        {/* Modal de Deudas */}
+        <AnimatePresence>
+          {deudasModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+              onClick={() => setDeudasModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+              >
+                <div className="flex items-center justify-between p-6 border-b">
+                  <div className="flex items-center gap-3">
+                    <UserX className="h-6 w-6 text-orange-600" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Deudas Pendientes - {clienteDeudas?.nombre}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Transferencias que aún no han sido recibidas
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDeudasModalOpen(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-96">
+                  {cargandoDeudas ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                      <span className="ml-2 text-gray-600">Cargando deudas...</span>
+                    </div>
+                  ) : transferenciasPendientes.length === 0 ? (
+                    <div className="text-center py-8">
+                      <UserX className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                      <p className="text-gray-600">Este cliente no tiene deudas pendientes</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {transferenciasPendientes.map((transferencia, index) => (
+                        <div key={index} className="border border-orange-200 rounded-lg p-4 bg-orange-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                Venta #{transferencia.id_venta}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                Fecha: {formatDate(transferencia.fecha_venta)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-orange-600">
+                                Q{transferencia.total_venta?.toFixed(2)}
+                              </p>
+                              <button
+                                onClick={() => eliminarDeuda(transferencia)}
+                                className="text-red-500 hover:text-red-700 mt-1"
+                                title="Marcar deuda como pagada"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 p-3 bg-white rounded border">
+                            <p className="text-sm font-medium text-gray-700 mb-1">
+                              Estado de Transferencia
+                            </p>
+                            <div className="text-sm">
+                              <span className="text-gray-500">Estado:</span>
+                              <span className="ml-2 font-medium text-orange-600">
+                                {transferencia.estado_transferencia === 'esperando' ? 'Esperando recepción' : transferencia.estado_transferencia}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="mt-6 p-4 bg-orange-100 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-orange-800">Total Adeudado:</span>
+                          <span className="text-xl font-bold text-orange-900">
+                            Q{transferenciasPendientes.reduce((total, t) => total + (t.total_venta || 0), 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
+                  <button
+                    onClick={() => setDeudasModalOpen(false)}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </AnimatePresence>
     </div>
   );

@@ -1404,7 +1404,7 @@ function ReportModal({
   );
 
   const printCss = `
-            @page { size: A4; margin: 12mm; }
+            @page { size: 80mm auto; margin: 2mm; }
 
             /* Ocultar el nodo imprimible en pantalla sin usar display:none */
             @media screen {
@@ -1412,8 +1412,8 @@ function ReportModal({
                 position: absolute;
                 left: -10000px;
                 top: -10000px;
-                width: 210mm;
-                height: 297mm;
+                width: 80mm;
+                height: auto;
                 opacity: 0;
                 pointer-events: none;
               }
@@ -1424,7 +1424,7 @@ function ReportModal({
               body * { visibility: visible; }
               html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               table { page-break-inside: avoid; break-inside: avoid; }
-              .sheet { width: 210mm; min-height: 297mm; }
+              .sheet { width: 80mm; min-height: auto; }
             }
           `;
 
@@ -1438,11 +1438,11 @@ function ReportModal({
 
       if (title?.includes('PDF')) {
         const opt = {
-          margin: 0.5,
+          margin: 0.1,
           filename: `cierre-caja-${new Date().toISOString().split('T')[0]}.pdf`,
           image: { type: 'jpeg' as const, quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'in' as const, format: 'a4' as const, orientation: 'portrait' as const }
+          jsPDF: { unit: 'in' as const, format: [3.15, 11.69], orientation: 'portrait' as const }
         };
 
         html2pdf().set(opt).from(node).outputPdf().then((pdf: Uint8Array) => {
@@ -1558,7 +1558,7 @@ function ReportModal({
 
           {/* CSS de impresi??n (EN STRING para evitar error de decorators) */}
           <style>{`
-            @page { size: A4; margin: 12mm; }
+            @page { size: 80mm auto; margin: 2mm; }
 
             /* Ocultar el nodo imprimible en pantalla sin usar display:none */
             @media screen {
@@ -1566,8 +1566,8 @@ function ReportModal({
                 position: absolute;
                 left: -10000px;
                 top: -10000px;
-                width: 210mm;
-                height: 297mm;
+                width: 80mm;
+                height: auto;
                 opacity: 0;
                 pointer-events: none;
               }
@@ -1585,7 +1585,7 @@ function ReportModal({
               }
               html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               table { page-break-inside: avoid; break-inside: avoid; }
-              .sheet { width: 210mm; min-height: 297mm; }
+              .sheet { width: 80mm; min-height: auto; }
               .no-print { display: none !important; }
             }
           `}</style>

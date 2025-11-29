@@ -24,6 +24,17 @@ export interface AbrirCajaDTO {
 export interface CerrarCajaDTO {
   monto_cierre?: number;
   observaciones?: string;
+  // Datos del arqueo
+  arqueo?: {
+    billetes_100: number;
+    billetes_50: number;
+    billetes_20: number;
+    billetes_10: number;
+    billetes_5: number;
+    monedas_1: number;
+    monedas_050: number;
+    monedas_025: number;
+  };
 }
 
 export interface CajaEstadoResponse {
@@ -58,4 +69,7 @@ export interface Arqueo {
   transferencias: any[]; // Lista de transferencias
   observaciones: string | null;
   estado: 'abierto' | 'cerrado' | 'revisado';
+  // Información de la sesión de caja
+  fecha_apertura?: string;
+  fecha_cierre?: string;
 }

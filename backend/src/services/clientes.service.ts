@@ -15,7 +15,20 @@ export class ClientesService {
       .order('nombre');
 
     if (error) throw new Error(`Error al obtener clientes: ${error.message}`);
-    return data || [];
+
+    // Para cada cliente, verificar si tiene transferencias pendientes
+    const clientesConDeudas = await Promise.all(
+      (data || []).map(async (cliente) => {
+        const transferenciasPendientes = await this.getTransferenciasPendientes(cliente.id_cliente);
+        return {
+          ...cliente,
+          tiene_transferencias_pendientes: transferenciasPendientes.length > 0,
+          cantidad_transferencias_pendientes: transferenciasPendientes.length,
+        };
+      })
+    );
+
+    return clientesConDeudas;
   }
 
   async getClienteById(id: number): Promise<Cliente | null> {
@@ -180,8 +193,25 @@ export class ClientesService {
   }
 
   /**
-   * Obtener producto favorito (más comprado) de un cliente
+   * Obtener transferencias pendientes de un cliente
    */
+  async getTransferenciasPendientes(idCliente: number): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('venta')
+      .select(`
+        id_venta,
+        fecha_venta,
+        total_venta,
+        estado_transferencia
+      `)
+      .eq('id_cliente', idCliente)
+      .eq('tipo_pago', 'Transferencia')
+      .eq('estado_transferencia', 'esperando')
+      .order('fecha_venta', { ascending: false });
+
+    if (error) throw new Error(`Error al obtener transferencias pendientes: ${error.message}`);
+    return data || [];
+  }
   async getProductoFavorito(idCliente: number): Promise<{ producto: string; cantidad: number } | null> {
     // First get venta ids for the client
     const { data: ventas, error: errorVentas } = await supabase
@@ -195,21 +225,39 @@ export class ClientesService {
 
     const ventaIds = ventas.map(v => v.id_venta);
 
-    // Then get detalles for those ventas
+    // Then get detalles for those ventas with product names
     const { data: detalles, error } = await supabase
       .from('detalle_venta')
       .select(`
         cantidad,
-        producto!inner(nombre)
+        id_producto
       `)
       .in('id_venta', ventaIds);
 
-    if (error) throw new Error(`Error al obtener producto favorito: ${error.message}`);
+    if (error) throw new Error(`Error al obtener detalles de venta: ${error.message}`);
 
     if (detalles && detalles.length > 0) {
+      // Get unique product IDs
+      const productIds = [...new Set(detalles.map(d => d.id_producto))];
+
+      // Get product names
+      const { data: productos, error: errorProductos } = await supabase
+        .from('producto')
+        .select('id_producto, nombre')
+        .in('id_producto', productIds);
+
+      if (errorProductos) throw new Error(`Error al obtener productos: ${errorProductos.message}`);
+
+      // Create a map of product ID to name
+      const productMap: { [key: number]: string } = {};
+      productos?.forEach(p => {
+        productMap[p.id_producto] = p.nombre;
+      });
+
+      // Count products
       const productCounts: { [key: string]: number } = {};
       detalles.forEach((item: any) => {
-        const productName = item.producto?.nombre;
+        const productName = productMap[item.id_producto];
         if (productName) {
           productCounts[productName] = (productCounts[productName] || 0) + item.cantidad;
         }

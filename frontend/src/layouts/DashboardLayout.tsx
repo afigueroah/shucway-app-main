@@ -42,6 +42,7 @@ interface AlertData {
 const sidebarItems = [
   { name: "Inicio", icon: <MdHome size={18} />, route: "/dashboard", module: "DASHBOARD" },
   { name: "Ventas", icon: <MdShoppingCart size={18} />, route: "/ventas", module: "VENTAS" },
+  { name: "Clientes", icon: <MdPerson size={18} />, route: "/clientes", module: "VENTAS" },
   { name: "Inventario", icon: <MdInventory size={18} />, route: "/inventario", module: "INVENTARIO" },
   { name: "Reportes", icon: <MdOutlineAssessment size={18} />, route: "/reportes", module: "REPORTES" },
   { name: "Administración", icon: <MdAdminPanelSettings size={18} />, route: "/administracion", module: "USUARIOS" },
@@ -49,15 +50,16 @@ const sidebarItems = [
 ];
 
 const sidebarSections = [
-  { title: "General", items: [sidebarItems[0], sidebarItems[1]] },
-  { title: "Operaciones", items: [sidebarItems[2], sidebarItems[3], sidebarItems[4]] },
-  { title: "Ajustes", items: [sidebarItems[5]] },
+  { title: "General", items: [sidebarItems[0], sidebarItems[1], sidebarItems[2]] },
+  { title: "Operaciones", items: [sidebarItems[3], sidebarItems[4], sidebarItems[5]] },
+  { title: "Ajustes", items: [sidebarItems[6]] },
 ];
 
 // colores provistos por el cliente
 const ICON_HEX: Record<string, string> = {
   Inicio: "#346C60",
   Ventas: "#00A149",
+  Clientes: "#00A149",
   Inventario: "#12443D",
   Reportes: "#FFC222",
   Administración: "#346C60",
@@ -260,6 +262,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   // Incluye los items del sidebar más rutas internas (lista ligera para evitar imports circulares)
   const extraRoutes: { name: string; route: string; section: string }[] = [
     { name: 'Dashboard', route: '/dashboard', section: 'General' },
+    { name: 'Clientes', route: '/clientes', section: 'General' },
     { name: 'Configuración', route: '/configuracion', section: 'Ajustes' },
     { name: 'Mantenimiento', route: '/configuracion/mantenimiento', section: 'Ajustes' },
     { name: 'Consultas SQL', route: '/configuracion/consultas-sql', section: 'Ajustes' },

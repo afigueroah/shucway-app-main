@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { clientesController } from '../controllers/clientes.controller';
+import { ClientesController } from '../controllers/clientes.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 import {
   requireCajero,
@@ -7,6 +7,7 @@ import {
 } from '../middlewares/roleGuard.middleware';
 
 const router = Router();
+const clientesController = new ClientesController();
 
 // ================================================================
 // 👥 RUTAS DE CLIENTES
@@ -33,5 +34,6 @@ router.post('/:id/puntos/gestionar', requireCajero, clientesController.gestionar
 router.post('/puntos/canjear', requireCajero, clientesController.canjearPuntos.bind(clientesController));
 router.get('/:id/historial-puntos', requireCajero, clientesController.getHistorialPuntos.bind(clientesController));
 router.get('/:id/producto-favorito', requireCajero, clientesController.getProductoFavorito.bind(clientesController));
+router.get('/:id/transferencias-pendientes', requireCajero, clientesController.getTransferenciasPendientes.bind(clientesController));
 
 export default router;
