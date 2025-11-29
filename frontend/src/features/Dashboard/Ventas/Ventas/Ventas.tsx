@@ -1914,8 +1914,22 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                           </td>
                           <td className="px-5 py-3.5 text-gray-700 text-[15px]">{currency(unitPrice)}</td>
                           <td className="px-5 py-3.5">
-                            <div className="inline-flex items-center rounded-lg border border-gray-200 px-3 h-10 select-none bg-white text-[15px]">
-                              {it.qty}
+                            <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white">
+                              <button
+                                onClick={() => setQty(it.producto.id_producto, it.mods, Math.max(1, it.qty - 1), it.id_variante)}
+                                className="px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-l-lg"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <div className="px-3 py-2 text-[15px] select-none min-w-[40px] text-center">
+                                {it.qty}
+                              </div>
+                              <button
+                                onClick={() => setQty(it.producto.id_producto, it.mods, it.qty + 1, it.id_variante)}
+                                className="px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-r-lg"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
                             </div>
                           </td>
                           <td className="px-5 py-3.5 font-semibold text-gray-900 text-[16px]">
@@ -1924,9 +1938,9 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                           <td className="px-5 py-3.5">
                             <button
                               onClick={() => removeItem(it.producto.id_producto, it.mods, it.id_variante)}
-                              className="text-gray-500 hover:text-emerald-600 text-[15px]"
+                              className="text-gray-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
                             >
-                              Eliminar
+                              <Trash2 className="w-5 h-5" />
                             </button>
                           </td>
                         </tr>

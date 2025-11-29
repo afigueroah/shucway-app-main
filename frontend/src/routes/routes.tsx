@@ -17,6 +17,7 @@ const VentasProducto = React.lazy(() => import("../features/Dashboard/Ventas/Ven
 const VentasCierreCaja = React.lazy(() => import("../features/Dashboard/Ventas/Ventas/CierreCaja"));
 const TicketVenta = React.lazy(() => import("../features/Dashboard/Ventas/Ventas/TicketVenta"));
 const HistorialVentasCompleto = React.lazy(() => import('../features/Dashboard/Ventas/Ventas/HistorialVentas'));
+const ArqueoCaja = React.lazy(() => import('../features/Dashboard/Ventas/Ventas/ArqueoCaja'));
 const CategoriasProductos = React.lazy(() => import("../features/Dashboard/Ventas/Categorias"));
 const Clientes = React.lazy(() => import("../features/Dashboard/Clientes"));
 const Inventario = React.lazy(() => import("../features/Dashboard/Inventario"));
@@ -145,6 +146,13 @@ const protectedRoutes: IRoute[] = [
   {
     path: "/ventas/historial",
     element: HistorialVentasCompleto,
+    guard: AuthGuard,
+    layout: DashboardLayout,
+    requiredLevel: MODULE_PERMISSIONS.VENTAS,
+  },
+  {
+    path: "/ventas/arqueo-caja",
+    element: ArqueoCaja,
     guard: AuthGuard,
     layout: DashboardLayout,
     requiredLevel: MODULE_PERMISSIONS.VENTAS,

@@ -11,10 +11,9 @@ function TipoCategoriaCard({ title, desc, examples, active, onClick }: { title: 
 }
 import { useNavigate } from 'react-router-dom';
 import { PiPlusBold, PiEyeBold, PiPencilSimpleBold, PiTrashBold, PiBroomBold, PiWarning, PiX } from 'react-icons/pi';
-import { MdClose, MdError } from 'react-icons/md';
-import { App } from 'antd';
+import { MdClose } from 'react-icons/md';
+import { message } from 'antd';
 import api from '../../../../api/apiClient';
-import { useAlerts } from '../../../../hooks/useAlerts';
 
 type Categoria = {
   id_categoria: number;
@@ -24,7 +23,6 @@ type Categoria = {
 };
 
 export default function Categorias() {
-  const { message } = App.useApp();
   const [rows, setRows] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +39,6 @@ export default function Categorias() {
   const [q, setQ] = useState<string>('');
   const [filterTipo, setFilterTipo] = useState<string>('Todas');
   const navigate = useNavigate();
-  const { addAlert } = useAlerts();
 
   const handleInputChange = (field: string, value: string) => {
     switch (field) {
@@ -78,12 +75,7 @@ export default function Categorias() {
       console.error('Error cargando categorías desde API/backend:', e);
       const m = e instanceof Error ? e.message : String(e);
       setError(m);
-      addAlert({
-        message: `Error cargando categorías: ${m}`,
-        icon: <MdError />,
-        module: 'Categorías',
-        action: () => {},
-      });
+      message.error(`Error cargando categorías: ${m}`);
     } finally {
       setLoading(false);
     }
@@ -173,13 +165,14 @@ export default function Categorias() {
   message.success(`¡Categoría ${editing ? 'actualizada' : 'creada'} correctamente!`);
     } catch (err: unknown) {
       console.error('Error guardando categoría:', err);
-      const m = err instanceof Error ? err.message : String(err);
-      addAlert({
-        message: `Error ${editing ? 'actualizando' : 'creando'} categoría: ${m}`,
-        icon: <MdError />,
-        module: 'Categorías',
-        action: () => {},
-      });
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      const lower = errorMessage.toLowerCase();
+      if (lower.includes('forbidden') || lower.includes('permission') || lower.includes('policy')) {
+        message.error(`Error de permisos al guardar categoría. Revisa roles/permisos en el backend. Detalles: ${errorMessage}`);
+      } else {
+        message.error(`Error guardando categoría. Revisa la consola para más detalles. ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -195,13 +188,14 @@ export default function Categorias() {
       message.success('¡Categoría eliminada correctamente!');
     } catch (err: unknown) {
       console.error('Error eliminando categoría:', err);
-      const m = err instanceof Error ? err.message : String(err);
-      addAlert({
-        message: `Error eliminando categoría: ${m}`,
-        icon: <MdError />,
-        module: 'Categorías',
-        action: () => {},
-      });
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      const lower = errorMessage.toLowerCase();
+      if (lower.includes('forbidden') || lower.includes('permission') || lower.includes('policy')) {
+        message.error(`Error de permisos al eliminar categoría. Revisa roles/permisos en el backend. Detalles: ${errorMessage}`);
+      } else {
+        message.error(`Error eliminando categoría. Revisa la consola para más detalles. ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }

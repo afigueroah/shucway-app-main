@@ -178,6 +178,7 @@ const CierreCaja: React.FC = () => {
 
   const [showArqueo, setShowArqueo] = useState<boolean>(false);
   const [arqueo, setArqueo] = useState<Record<string, number>>(() => makeEmptyArqueo());
+  const [arqueoAplicado, setArqueoAplicado] = useState<boolean>(false);
   const totalArqueoCents = useMemo(
     () => DENOMS.reduce((acc, d) => acc + Math.round(d * 100) * (arqueo[d.toString()] || 0), 0),
     [arqueo]
@@ -186,6 +187,7 @@ const CierreCaja: React.FC = () => {
   const limpiarArqueo = () => setArqueo(makeEmptyArqueo());
   const aplicarArqueo = () => {
     setEfectivoContado(totalArqueo);
+    setArqueoAplicado(true);
     setShowArqueo(false);
   };
 
@@ -196,6 +198,7 @@ const CierreCaja: React.FC = () => {
     setTransferVerificada(0);
     setTransferEsperada(0);
     setArqueo(makeEmptyArqueo());
+    setArqueoAplicado(false);
     setTotalSistema(0);
     setObservacionesArqueo("");
     setReporteVisible(false);
@@ -215,10 +218,17 @@ const CierreCaja: React.FC = () => {
     [efectivoContado, efectivoEsperadoCalc, transferVerificada]
   );
 
+  const todasTransferenciasVerificadas = useMemo(
+    () => transferencias.length === 0 || transferencias.every(t => t.estado_transferencia === 'recibido'),
+    [transferencias]
+  );
+
   const registroCompleto =
     efectivoContado >= 0 &&
     transferVerificada >= 0 &&
-    sesionCaja !== null; // Solo requiere que haya una sesión de caja abierta
+    sesionCaja !== null &&
+    arqueoAplicado &&
+    todasTransferenciasVerificadas;
 
   const abrirReporte = () => setReporteVisible(true);
 
@@ -384,7 +394,12 @@ const CierreCaja: React.FC = () => {
       return;
     }
     if (!registroCompleto) {
-      setToast("Completa el registro antes de cerrar la caja.");
+      setToast("Completa el registro antes de cerrar la caja. Asegúrate de contar los billetes y verificar todas las transferencias.");
+      setTimeout(() => setToast(null), 2200);
+      return;
+    }
+    if (diferencia !== 0 && observacionesArqueo.trim() === "") {
+      setToast("Si hay diferencias en el cierre, es obligatorio rellenar las observaciones.");
       setTimeout(() => setToast(null), 2200);
       return;
     }
@@ -522,7 +537,8 @@ const CierreCaja: React.FC = () => {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setEfectivoContado(parseFloat(e.target.value) || 0)
                   }
-                  className="w-full border rounded-lg px-3 h-11"
+                  readOnly={!arqueoAplicado}
+                  className={`w-full border rounded-lg px-3 h-11 ${!arqueoAplicado ? 'bg-gray-50 text-gray-500' : ''}`}
                 />
                 <input
                   type="number"
@@ -542,6 +558,9 @@ const CierreCaja: React.FC = () => {
                   <FaMoneyBillWave size={18} />
                   <span className="text-sm font-medium">Billetes</span>
                 </button>
+                {!arqueoAplicado && (
+                  <p className="text-xs text-amber-600 col-span-2">Usa el botón "Billetes" para contar el efectivo antes de cerrar la caja.</p>
+                )}
               </div>
             </div>
 
@@ -576,6 +595,9 @@ const CierreCaja: React.FC = () => {
                   <FaMoneyCheckAlt size={18} />
                   <span className="text-sm font-medium">Verificar Transferencias</span>
                 </button>
+                {!todasTransferenciasVerificadas && transferencias.length > 0 && (
+                  <p className="text-xs text-amber-600 col-span-2">Verifica todas las transferencias antes de cerrar la caja.</p>
+                )}
               </div>
             </div>
           </div>

@@ -419,6 +419,14 @@ const VentasDashboard: React.FC = () => {
         background: "#fff7ed",
         value: `Q${metrics.totalIngresos.toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       },
+      {
+        key: "arqueoCaja",
+        label: "Arqueo de Caja",
+        icon: Landmark,
+        accent: "#7c3aed",
+        background: "#faf5ff",
+        value: "Ver Registro",
+      },
     ];
 
     return base;
@@ -480,25 +488,45 @@ const VentasDashboard: React.FC = () => {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, delay: 0.02 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
+        className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6"
       >
         {kpiCards.map((card) => (
-          <motion.div
-            key={card.key}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="report-card"
-            style={{ background: card.background }}
-          >
-            <div className="report-card__icon" style={{ color: card.accent }}>
-              <card.icon size={22} />
-            </div>
-            <div className="report-card__content">
-              <span className="report-card__label">{card.label}</span>
-              <span className="report-card__value">{card.value}</span>
-            </div>
-          </motion.div>
+          card.key === "arqueoCaja" ? (
+            <motion.button
+              key={card.key}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="report-card cursor-pointer hover:shadow-lg transition-shadow"
+              style={{ background: card.background }}
+              onClick={() => navigate('/ventas/arqueo-caja')}
+            >
+              <div className="report-card__icon" style={{ color: card.accent }}>
+                <card.icon size={22} />
+              </div>
+              <div className="report-card__content">
+                <span className="report-card__label">{card.label}</span>
+                <span className="report-card__value">{card.value}</span>
+              </div>
+            </motion.button>
+          ) : (
+            <motion.div
+              key={card.key}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="report-card"
+              style={{ background: card.background }}
+            >
+              <div className="report-card__icon" style={{ color: card.accent }}>
+                <card.icon size={22} />
+              </div>
+              <div className="report-card__content">
+                <span className="report-card__label">{card.label}</span>
+                <span className="report-card__value">{card.value}</span>
+              </div>
+            </motion.div>
+          )
         ))}
       </motion.div>
 
