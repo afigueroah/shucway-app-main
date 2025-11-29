@@ -30,9 +30,13 @@ export class VentasService {
         if (value.includes('T')) {
           return endOfDay ? value.replace(/T\d{2}:\d{2}:\d{2}/, 'T23:59:59.999') : value.replace(/T\d{2}:\d{2}:\d{2}/, 'T00:00:00.000');
         }
-        // Convertir fecha sin hora a timestamp completo
-        const isoDate = value;
-        return endOfDay ? `${isoDate}T23:59:59.999` : `${isoDate}T00:00:00.000`;
+        // If format is 'YYYY-MM-DD HH:MM:SS', convert to ISO
+        if (value.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+          const [date, time] = value.split(' ');
+          return endOfDay ? `${date}T23:59:59.999` : `${date}T${time}.000`;
+        }
+        // Assume it's just date
+        return endOfDay ? `${value}T23:59:59.999` : `${value}T00:00:00.000`;
       };
 
       const fechaInicioIso = normalizeDateParam(fechaInicio, false);
@@ -305,15 +309,15 @@ export class VentasService {
     // 2. Crear detalles de venta (triggers calculan precio_unitario, costo_unitario y totales)
     const detallesConVenta = dto.detalles.map((detalle) => ({
       id_venta: venta.id_venta,
-      id_producto: detalle.id_producto,
-      id_variante: detalle.id_variante,
-      cantidad: detalle.cantidad,
-      precio_unitario: detalle.precio_unitario,
+      id_producto: parseInt(detalle.id_producto),
+      id_variante: detalle.id_variante ? parseInt(detalle.id_variante) : null,
+      cantidad: parseFloat(detalle.cantidad),
+      precio_unitario: parseFloat(detalle.precio_unitario),
       costo_unitario: 0, // Se calcula automáticamente por trigger fn_calcular_precio_costo_venta
-      descuento: detalle.descuento || 0,
+      descuento: parseFloat(detalle.descuento || 0),
       // Si la venta es tipo 'Canje' o el unitario es 0, marcar el detalle como canje
-      es_canje_puntos: detalle.es_canje_puntos ?? (dto.tipo_pago === 'Canje' || detalle.precio_unitario === 0),
-      puntos_canjeados: detalle.puntos_canjeados || 0,
+      es_canje_puntos: detalle.es_canje_puntos ?? (dto.tipo_pago === 'Canje' || parseFloat(detalle.precio_unitario) === 0),
+      puntos_canjeados: parseInt(detalle.puntos_canjeados || 0),
     }));
 
     const { error: detallesError } = await supabase

@@ -1,6 +1,6 @@
 import { supabase } from '../config/database';
 import { AppError } from '../middlewares/errorHandler.middleware';
-import { AbrirCajaDTO, CajaEstadoResponse, CajaSesion, CerrarCajaDTO } from '../types/caja.types';
+import { AbrirCajaDTO, CajaEstadoResponse, CajaSesion, CerrarCajaDTO, Arqueo } from '../types/caja.types';
 
 type CajaSesionRow = {
   id_sesion: number;
@@ -84,7 +84,48 @@ class CajaService {
       throw new Error(`Error al marcar caja expirada: ${error.message}`);
     }
 
+    // Crear arqueo automático al cerrar automáticamente
+    await this.crearArqueoAutomatico(session, fechaCierre);
+
     return this.toCajaSesion(data);
+  }
+
+  private async crearArqueoAutomatico(session: CajaSesion, fechaCierre: string): Promise<void> {
+    const fechaArqueo = new Date(fechaCierre).toISOString().split('T')[0];
+    
+    // Obtener total de ventas en efectivo para esa sesión (aproximado)
+    // Como no hay id_sesion en venta, usar fecha
+    const fechaDia = fechaArqueo;
+    const { data: ventas, error: errorVentas } = await supabase
+      .from('venta')
+      .select('total_venta, tipo_pago')
+      .eq('estado', 'confirmada')
+      .gte('fecha_venta', fechaDia + ' 00:00:00')
+      .lte('fecha_venta', fechaDia + ' 23:59:59');
+
+    if (errorVentas) {
+      console.error('Error obteniendo ventas para arqueo automático:', errorVentas);
+      return;
+    }
+
+    const totalEfectivo = ventas?.filter(v => v.tipo_pago === 'Cash').reduce((sum, v) => sum + Number(v.total_venta), 0) || 0;
+    const transferencias = await this.getTransferenciasPorFecha(fechaArqueo);
+
+    // Insertar arqueo con total_contado = total_sistema (efectivo)
+    const { error } = await supabase
+      .from('arqueo_caja')
+      .insert({
+        fecha_arqueo: fechaArqueo,
+        id_cajero: session.id_cajero_apertura,
+        total_sistema: totalEfectivo,
+        transferencias: transferencias,
+        observaciones: 'Arqueo automático por cierre expirado',
+        estado: 'cerrado'
+      });
+
+    if (error) {
+      console.error('Error creando arqueo automático:', error);
+    }
   }
 
   private async ensureActiveSession(): Promise<CajaEstadoResponse> {
@@ -171,6 +212,89 @@ class CajaService {
     }
 
     return estado.sesion;
+  }
+
+  async getArqueos(fechaInicio?: string, fechaFin?: string): Promise<Arqueo[]> {
+    let query = supabase
+      .from('arqueo_caja')
+      .select('*')
+      .order('fecha_arqueo', { ascending: false });
+
+    if (fechaInicio) {
+      query = query.gte('fecha_arqueo', fechaInicio);
+    }
+    if (fechaFin) {
+      query = query.lte('fecha_arqueo', fechaFin + ' 23:59:59');
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new AppError(`Error al obtener arqueos: ${error.message}`, 500);
+    }
+
+    // Para cada arqueo, si transferencias está vacío, poblarlo
+    const arqueos = await Promise.all(data.map(async (row) => {
+      let transferencias = row.transferencias || [];
+      if (transferencias.length === 0) {
+        transferencias = await this.getTransferenciasPorFecha(row.fecha_arqueo);
+        // Opcional: actualizar la BD, pero por ahora solo en memoria
+      }
+      return {
+        id_arqueo: row.id_arqueo,
+        fecha_arqueo: row.fecha_arqueo,
+        id_cajero: row.id_cajero,
+        billetes_100: row.billetes_100,
+        billetes_50: row.billetes_50,
+        billetes_20: row.billetes_20,
+        billetes_10: row.billetes_10,
+        billetes_5: row.billetes_5,
+        monedas_1: row.monedas_1,
+        monedas_050: row.monedas_050,
+        monedas_025: row.monedas_025,
+        total_billetes_100: Number(row.total_billetes_100),
+        total_billetes_50: Number(row.total_billetes_50),
+        total_billetes_20: Number(row.total_billetes_20),
+        total_billetes_10: Number(row.total_billetes_10),
+        total_billetes_5: Number(row.total_billetes_5),
+        total_monedas_1: Number(row.total_monedas_1),
+        total_monedas_050: Number(row.total_monedas_050),
+        total_monedas_025: Number(row.total_monedas_025),
+        total_contado: Number(row.total_contado),
+        total_sistema: Number(row.total_sistema),
+        diferencia: Number(row.diferencia),
+        transferencias,
+        observaciones: row.observaciones,
+        estado: row.estado,
+      };
+    }));
+
+    return arqueos;
+  }
+
+  private async getTransferenciasPorFecha(fecha: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('deposito_banco')
+      .select('*')
+      .eq('fecha_deposito', fecha);
+
+    if (error) {
+      console.error('Error obteniendo transferencias:', error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  async deleteArqueo(id: number): Promise<void> {
+    const { error } = await supabase
+      .from('arqueo_caja')
+      .delete()
+      .eq('id_arqueo', id);
+
+    if (error) {
+      throw new AppError(`Error al eliminar arqueo: ${error.message}`, 500);
+    }
   }
 }
 

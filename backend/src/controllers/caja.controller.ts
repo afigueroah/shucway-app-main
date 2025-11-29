@@ -44,6 +44,26 @@ export class CajaController {
       next(error);
     }
   }
+
+  async getArqueos(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { fechaInicio, fechaFin } = req.query as { fechaInicio?: string; fechaFin?: string };
+      const arqueos = await cajaService.getArqueos(fechaInicio, fechaFin);
+      res.json({ success: true, data: arqueos });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteArqueo(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      await cajaService.deleteArqueo(Number(id));
+      res.json({ success: true, message: 'Arqueo eliminado correctamente.' });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const cajaController = new CajaController();

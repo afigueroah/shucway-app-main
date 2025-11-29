@@ -75,14 +75,14 @@ WHERE token_recuperacion IS NOT NULL;
 -- MÓDULO: Inventario (Modelo Híbrido Perpetuo + Operativo)
 -- ===============================================
 
-CREATE TABLE categoria_insumo (
+CREATE TABLE IF NOT EXISTS categoria_insumo (
     id_categoria SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE,
     descripcion TEXT,
     tipo_categoria VARCHAR(20) DEFAULT 'operativo' CHECK (tipo_categoria IN ('perpetuo', 'operativo'))
 );
 
-CREATE TABLE proveedor (
+CREATE TABLE IF NOT EXISTS proveedor (
     id_proveedor SERIAL PRIMARY KEY,
     nombre_empresa VARCHAR(100) NOT NULL,
     nombre_contacto VARCHAR(100),
@@ -94,7 +94,7 @@ CREATE TABLE proveedor (
     es_preferido BOOLEAN DEFAULT FALSE
 );
 
-CREATE TABLE insumo (
+CREATE TABLE IF NOT EXISTS insumo (
     id_insumo SERIAL PRIMARY KEY,
     nombre_insumo VARCHAR(100) NOT NULL,
     id_categoria INTEGER NOT NULL REFERENCES categoria_insumo(id_categoria),
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS insumo_presentacion (
 
 CREATE INDEX IF NOT EXISTS idx_insu_pres_insumo ON insumo_presentacion(id_insumo);
 
-CREATE TABLE lote_insumo (
+CREATE TABLE IF NOT EXISTS lote_insumo (
     id_lote SERIAL PRIMARY KEY,
     id_insumo INTEGER REFERENCES insumo(id_insumo),
     fecha_vencimiento DATE,
@@ -133,7 +133,7 @@ CREATE TABLE lote_insumo (
     ubicacion VARCHAR(100)
 );
 
-CREATE TABLE movimiento_inventario (
+CREATE TABLE IF NOT EXISTS movimiento_inventario (
     id_movimiento SERIAL PRIMARY KEY,
     id_insumo INTEGER REFERENCES insumo(id_insumo),
     id_lote INTEGER REFERENCES lote_insumo(id_lote),
@@ -154,7 +154,7 @@ CREATE TABLE movimiento_inventario (
 -- MÓDULO: Compras y Proveedores 
 -- ===============================================================
 
-CREATE TABLE orden_compra (
+CREATE TABLE IF NOT EXISTS orden_compra (
     id_orden SERIAL PRIMARY KEY,
     numero_orden VARCHAR(20) NULL,
     fecha_orden TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -170,7 +170,7 @@ CREATE TABLE orden_compra (
     aprobado_por INTEGER REFERENCES perfil_usuario(id_perfil)
 );
 
-CREATE TABLE detalle_orden_compra (
+CREATE TABLE IF NOT EXISTS detalle_orden_compra (
     id_detalle SERIAL PRIMARY KEY,
     id_orden INTEGER REFERENCES orden_compra(id_orden) ON DELETE CASCADE,
     id_insumo INTEGER REFERENCES insumo(id_insumo),
@@ -213,7 +213,7 @@ BEFORE INSERT OR UPDATE ON detalle_orden_compra
 FOR EACH ROW
 EXECUTE FUNCTION fn_calcular_iva_detalle_oc();
 
-CREATE TABLE recepcion_mercaderia (
+CREATE TABLE IF NOT EXISTS recepcion_mercaderia (
     id_recepcion SERIAL PRIMARY KEY,
     id_orden INTEGER REFERENCES orden_compra(id_orden),
     fecha_recepcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -221,7 +221,7 @@ CREATE TABLE recepcion_mercaderia (
     numero_factura VARCHAR(50)
 );
 
-CREATE TABLE detalle_recepcion_mercaderia (
+CREATE TABLE IF NOT EXISTS detalle_recepcion_mercaderia (
     id_detalle SERIAL PRIMARY KEY,
     id_recepcion INTEGER REFERENCES recepcion_mercaderia(id_recepcion),
     id_detalle_orden INTEGER REFERENCES detalle_orden_compra(id_detalle),
@@ -236,14 +236,14 @@ CREATE TABLE detalle_recepcion_mercaderia (
 -- MÓDULO: Productos y Ventas 
 -- ===============================================================
 
-CREATE TABLE categoria_producto (
+CREATE TABLE IF NOT EXISTS categoria_producto (
     id_categoria SERIAL PRIMARY KEY,
     nombre_categoria VARCHAR(50) NOT NULL UNIQUE,
     descripcion TEXT,
     estado VARCHAR(20) DEFAULT 'activo' CHECK (estado IN ('activo', 'desactivado'))
 );
 
-CREATE TABLE producto (
+CREATE TABLE IF NOT EXISTS producto (
     id_producto SERIAL PRIMARY KEY,
     nombre_producto VARCHAR(100) NOT NULL,
     descripcion TEXT,
@@ -255,7 +255,7 @@ CREATE TABLE producto (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE producto_variante (
+CREATE TABLE IF NOT EXISTS producto_variante (
     id_variante SERIAL PRIMARY KEY,
     id_producto INTEGER NOT NULL REFERENCES producto(id_producto) ON DELETE CASCADE,
     id_insumo INTEGER REFERENCES insumo(id_insumo),
@@ -267,7 +267,7 @@ CREATE TABLE producto_variante (
     UNIQUE(id_producto, nombre_variante)
 );
 
-CREATE TABLE receta_detalle (
+CREATE TABLE IF NOT EXISTS receta_detalle (
     id_receta SERIAL PRIMARY KEY,
     id_producto INTEGER NOT NULL REFERENCES producto(id_producto) ON DELETE CASCADE,
     id_variante INTEGER REFERENCES producto_variante(id_variante),
@@ -285,7 +285,7 @@ BEFORE INSERT OR UPDATE ON receta_detalle
 FOR EACH ROW
 EXECUTE FUNCTION fn_actualizar_unidad_base_receta();
 
-CREATE TABLE cliente (
+CREATE TABLE IF NOT EXISTS cliente (
     id_cliente SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     telefono VARCHAR(15),
@@ -294,7 +294,7 @@ CREATE TABLE cliente (
     ultima_compra TIMESTAMP
 );
 
-CREATE TABLE venta (
+CREATE TABLE IF NOT EXISTS venta (
     id_venta SERIAL PRIMARY KEY, 
     fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     id_cliente INTEGER REFERENCES cliente(id_cliente),
@@ -308,7 +308,7 @@ CREATE TABLE venta (
     notas TEXT
 );
 
-CREATE TABLE detalle_venta (
+CREATE TABLE IF NOT EXISTS detalle_venta (
     id_detalle SERIAL PRIMARY KEY,
     id_venta INTEGER REFERENCES venta(id_venta) ON DELETE CASCADE,
     id_producto INTEGER REFERENCES producto(id_producto),
@@ -328,7 +328,7 @@ CREATE TABLE detalle_venta (
 -- MÓDULO: Gastos Operativos y Movimientos
 -- ===============================================================
 
-CREATE TABLE categoria_gasto (
+CREATE TABLE IF NOT EXISTS categoria_gasto (
     id_categoria SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE,
     descripcion TEXT,
@@ -336,7 +336,7 @@ CREATE TABLE categoria_gasto (
     activo BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE gasto_operativo (
+CREATE TABLE IF NOT EXISTS gasto_operativo (
     id_gasto SERIAL PRIMARY KEY,
     numero_gasto VARCHAR(20) GENERATED ALWAYS AS ('GAST-' || LPAD(id_gasto::TEXT, 6, '0')) STORED,
     fecha_gasto DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -358,7 +358,7 @@ CREATE TABLE gasto_operativo (
 CREATE INDEX IF NOT EXISTS idx_gasto_operativo_categoria ON gasto_operativo(categoria_gasto);
 CREATE INDEX IF NOT EXISTS idx_gasto_operativo_frecuencia ON gasto_operativo(frecuencia);
 
-CREATE TABLE deposito_banco (
+CREATE TABLE IF NOT EXISTS deposito_banco (
     id_deposito SERIAL PRIMARY KEY,
     fecha_deposito TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     descripcion TEXT NOT NULL,
@@ -373,7 +373,7 @@ CREATE TABLE deposito_banco (
 );
 
 -- TABLA DE ARQUEO DE CAJA
-CREATE TABLE arqueo_caja (
+CREATE TABLE IF NOT EXISTS arqueo_caja (
     id_arqueo SERIAL PRIMARY KEY,
     fecha_arqueo DATE DEFAULT CURRENT_DATE,
     id_cajero INTEGER REFERENCES perfil_usuario(id_perfil),
@@ -405,6 +405,7 @@ CREATE TABLE arqueo_caja (
          billetes_10 * 10 + billetes_5 * 5 + monedas_1 * 1 + 
          monedas_050 * 0.50 + monedas_025 * 0.25) - total_sistema
     ) STORED,
+    transferencias JSONB DEFAULT '[]'::jsonb, -- Lista de transferencias realizadas
     observaciones TEXT,
     estado VARCHAR(20) DEFAULT 'abierto' CHECK (estado IN ('abierto', 'cerrado', 'revisado'))
 );
@@ -414,7 +415,7 @@ CREATE TABLE arqueo_caja (
 -- ===============================================================
 
 -- TABLA DE HISTORIAL DE PUNTOS
-CREATE TABLE historial_puntos (
+CREATE TABLE IF NOT EXISTS historial_puntos (
     id_historial SERIAL PRIMARY KEY,
     id_cliente INTEGER NOT NULL REFERENCES cliente(id_cliente) ON DELETE CASCADE,
     id_venta INTEGER REFERENCES venta(id_venta),
@@ -446,7 +447,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ===============================================================
 
 -- BITÁCORA DE CAMBIOS EN INVENTARIO
-CREATE TABLE bitacora_inventario (
+CREATE TABLE IF NOT EXISTS bitacora_inventario (
     id_bitacora_inventario SERIAL PRIMARY KEY,
     id_insumo INTEGER REFERENCES insumo(id_insumo),
     accion VARCHAR(50) CHECK (accion IN (
@@ -463,7 +464,7 @@ CREATE TABLE bitacora_inventario (
     descripcion TEXT
 );
 
-CREATE TABLE bitacora_ventas (
+CREATE TABLE IF NOT EXISTS bitacora_ventas (
     id_bitacora_venta SERIAL PRIMARY KEY,
     id_venta INTEGER REFERENCES venta(id_venta) ON DELETE CASCADE,
     accion VARCHAR(50) CHECK (accion IN (
@@ -479,7 +480,7 @@ CREATE TABLE bitacora_ventas (
     datos_adicionales JSONB
 );
 
-CREATE TABLE bitacora_ordenes_compra (
+CREATE TABLE IF NOT EXISTS bitacora_ordenes_compra (
     id_bitacora_orden SERIAL PRIMARY KEY,
     id_orden INTEGER REFERENCES orden_compra(id_orden) ON DELETE CASCADE,
     accion VARCHAR(50) CHECK (accion IN (
@@ -497,7 +498,7 @@ CREATE TABLE bitacora_ordenes_compra (
     datos_adicionales JSONB
 );
 
-CREATE TABLE bitacora_productos (
+CREATE TABLE IF NOT EXISTS bitacora_productos (
     id_bitacora_producto SERIAL PRIMARY KEY,
     id_producto INTEGER REFERENCES producto(id_producto) ON DELETE CASCADE,
     accion VARCHAR(50) CHECK (accion IN (
@@ -616,6 +617,7 @@ DECLARE
     v_consumo NUMERIC(12,3);
     v_valor_anterior NUMERIC(12,3);
     v_valor_nuevo NUMERIC(12,3);
+    v_a_retirar NUMERIC(12,4);
 BEGIN
     FOR v_detalle IN
         SELECT 
@@ -644,10 +646,10 @@ BEGIN
 
         IF v_stock_disponible < v_cantidad_a_descontar THEN
             RAISE EXCEPTION USING MESSAGE = format(
-                'Stock insuficiente para el insumo "%s". Requerido: %.3f, disponible: %.3f',
+                'Stock insuficiente para el insumo "%s". Requerido: %s, disponible: %s',
                 v_detalle.nombre_insumo,
-                v_cantidad_a_descontar,
-                v_stock_disponible
+                to_char(v_cantidad_a_descontar, 'FM999999990.000'),
+                to_char(v_stock_disponible, 'FM999999990.000')
             );
         END IF;
 
@@ -707,7 +709,7 @@ BEGIN
                     to_char(v_valor_anterior, 'FM999999990.000'),
                     to_char(v_valor_nuevo, 'FM999999990.000'),
                     p_id_perfil,
-                    format('Venta #%s - consumo de %.3f unidades (producto %s)', p_id_venta, v_consumo, v_detalle.id_producto)
+                    format('Venta #%s - consumo de %s unidades (producto %s)', p_id_venta, to_char(v_consumo, 'FM999999990.000'), v_detalle.id_producto)
                 );
 
                 v_cantidad_restante := ROUND(v_cantidad_restante - v_consumo, 3);
@@ -716,10 +718,10 @@ BEGIN
 
         IF v_cantidad_restante > 0.0001 THEN
             RAISE EXCEPTION USING MESSAGE = format(
-                'No se pudo consumir completamente el insumo "%s" para la venta %s. Faltante: %.3f',
+                'No se pudo consumir completamente el insumo "%s" para la venta %s. Faltante: %s',
                 v_detalle.nombre_insumo,
                 p_id_venta,
-                v_cantidad_restante
+                to_char(v_cantidad_restante, 'FM999999990.000')
             );
         END IF;
     END LOOP;
@@ -741,11 +743,19 @@ BEGIN
     FROM producto 
     WHERE id_producto = NEW.id_producto;
     
+    IF NOT FOUND THEN
+        RAISE EXCEPTION USING MESSAGE = format('Producto con ID %s no encontrado', NEW.id_producto);
+    END IF;
+
     IF NEW.id_variante IS NOT NULL THEN
         SELECT precio_variante, costo_variante
         INTO v_precio_variante, v_costo_variante
         FROM producto_variante
         WHERE id_variante = NEW.id_variante;
+        
+        IF NOT FOUND THEN
+            RAISE EXCEPTION USING MESSAGE = format('Variante de producto con ID %s no encontrada', NEW.id_variante);
+        END IF;
     END IF;
 
     NEW.precio_unitario := v_precio_base + COALESCE(v_precio_variante, 0);
@@ -912,7 +922,7 @@ BEGIN
 
     -- Validar que se encontró el insumo
     IF NEW.id_insumo IS NULL THEN
-        RAISE EXCEPTION 'No se encontró insumo para la presentación %', NEW.id_presentacion;
+        RAISE EXCEPTION USING MESSAGE = format('No se encontró insumo para la presentación %s', NEW.id_presentacion);
     END IF;
 
     RETURN NEW;
@@ -1150,10 +1160,10 @@ BEGIN
                 COALESCE(v_cantidad_anterior, 0)::text,
                 COALESCE(v_cantidad_nueva, v_cantidad_anterior)::text,
                 v_detalle.id_perfil,
-                 FORMAT('Recepcion #%s (OC #%s) - %+s unidades base. Presentacion ID %s. Costo unitario %s. Total %s',
+                 FORMAT('Recepcion #%s (OC #%s) - %s unidades base. Presentacion ID %s. Costo unitario %s. Total %s',
                     v_detalle.id_recepcion,
                     NEW.id_orden,
-                    v_cantidad_base,
+                    CASE WHEN v_cantidad_base >= 0 THEN '+' || v_cantidad_base::text ELSE v_cantidad_base::text END,
                     v_detalle.id_presentacion,
                     v_costo_unitario,
                     v_costo_total)
@@ -1432,7 +1442,7 @@ EXECUTE FUNCTION fn_reiniciar_puntos_cliente();
 
 -- ===========================amiwis
 
-CREATE TABLE auditoria_inventario (
+CREATE TABLE IF NOT EXISTS auditoria_inventario (
     id_auditoria SERIAL PRIMARY KEY,
     nombre_auditoria VARCHAR(100) NOT NULL,
     fecha_inicio_periodo DATE NOT NULL,  
@@ -1445,7 +1455,7 @@ CREATE TABLE auditoria_inventario (
     total_discrepancias INTEGER DEFAULT 0
 );
 
-CREATE TABLE auditoria_detalle (
+CREATE TABLE IF NOT EXISTS auditoria_detalle (
     id_detalle SERIAL PRIMARY KEY,
     id_auditoria INTEGER REFERENCES auditoria_inventario(id_auditoria) ON DELETE CASCADE,
     id_insumo INTEGER REFERENCES insumo(id_insumo),
@@ -1458,7 +1468,16 @@ CREATE TABLE auditoria_detalle (
     ubicacion_conteo VARCHAR(100)
 );
 
-CREATE TABLE bitacora_auditoria (
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bitacora_auditoria' AND table_schema = 'public') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bitacora_auditoria' AND column_name = 'nombre_auditor' AND table_schema = 'public') THEN
+            ALTER TABLE bitacora_auditoria RENAME COLUMN nombre_auditor TO nombre_auditoria;
+        END IF;
+    END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS bitacora_auditoria (
     id_bitacora SERIAL PRIMARY KEY,
     id_auditoria INTEGER REFERENCES auditoria_inventario(id_auditoria) ON DELETE CASCADE,
     nombre_auditoria VARCHAR(100),
@@ -2274,7 +2293,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trigger_actualizar_fecha_orden_compra
+DROP TRIGGER IF EXISTS trigger_actualizar_fecha_orden_compra ON orden_compra;
+CREATE TRIGGER trigger_actualizar_fecha_orden_compra
     BEFORE UPDATE ON orden_compra
     FOR EACH ROW
     EXECUTE FUNCTION actualizar_fecha_orden_compra();
@@ -2585,3 +2605,6 @@ CREATE TRIGGER trg_bitacora_ventas
 AFTER INSERT OR UPDATE OR DELETE ON venta
 FOR EACH ROW
 EXECUTE FUNCTION fn_bitacora_ventas();
+
+-- Agregar columna transferencias a arqueo_caja si no existe
+ALTER TABLE arqueo_caja ADD COLUMN IF NOT EXISTS transferencias JSONB DEFAULT '[]'::jsonb;
