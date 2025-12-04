@@ -15,7 +15,7 @@ export interface Venta {
   total_venta: number;
   total_costo: number;
   ganancia: number;
-  id_cajero: number;
+  id_cajero: string;
   notas?: string;
   // Datos adicionales para el frontend
   productos?: string; // Para mostrar en la tabla
@@ -110,7 +110,7 @@ export const ventasService = {
     estado?: string,
     fechaInicio?: string,
     fechaFin?: string,
-    idCajero?: number
+    idCajero?: string
   ): Promise<Venta[]> {
     try {
       const params = new URLSearchParams();

@@ -81,9 +81,6 @@ const metodoBadgeClass = (metodo: string) => {
     case "Efectivo":
       // #00B074 con hover un poco más oscuro
       return "bg-[#00B074] hover:brightness-95 text-white";
-    case "Cupón":
-      // #C2E66E con texto #123 (== #112233)
-      return "bg-[#C2E66E] hover:brightness-95 text-[#112233]";
     case "Transferencia":
       // #3f3d46 (outline), texto blanco
       return "bg-[#3f3d46] hover:brightness-110 text-white";
@@ -96,8 +93,6 @@ const MetodoIcon: React.FC<{ metodo: string; className?: string }> = ({ metodo, 
   switch (metodo) {
     case "Efectivo":
       return <Banknote className={className} strokeWidth={2} />;
-    case "Cupón":
-      return <Gift className={className} strokeWidth={2} />;
     case "Transferencia":
       return <Landmark className={className} strokeWidth={2} />;
     default:
@@ -304,7 +299,7 @@ const VentasDashboard: React.FC = () => {
       productos: venta.productos_resumen || venta.productos || 'Productos varios',
       total: venta.total_venta,
       metodo: venta.tipo_pago === 'Cash' ? 'Efectivo' :
-              venta.tipo_pago === 'Tarjeta' ? 'Cupón' :
+              venta.tipo_pago === 'Tarjeta' ? 'Transferencia' :
               venta.tipo_pago === 'Transferencia' ? 'Transferencia' : 'Otro',
       fecha: venta.fecha_venta,
     }));
@@ -673,7 +668,7 @@ const VentasDashboard: React.FC = () => {
                 {showFilter && (
                   <div className="absolute z-20 mt-2 w-56 rounded-xl border border-gray-200 bg-white shadow-lg p-3">
                     <p className="text-xs font-semibold text-gray-500 mb-2">Método de pago</p>
-                    {(["Efectivo", "Transferencia", "Cupón"] as const).map((m) => (
+                    {(["Efectivo", "Transferencia"] as const).map((m) => (
                       <label key={m} className="flex items-center gap-2 py-1 text-sm cursor-pointer">
                         <input
                           type="checkbox"

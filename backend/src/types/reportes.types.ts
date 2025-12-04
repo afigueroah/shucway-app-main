@@ -27,7 +27,7 @@ export interface VentaPorProducto {
 }
 
 export interface VentaPorCajero {
-  id_cajero: number;
+  id_cajero: string;
   nombre_cajero: string;
   cantidad_ventas: number;
   total_vendido: number;
@@ -103,7 +103,7 @@ export interface ArqueoResumen {
 export interface GenerarReporteVentasDTO {
   fecha_inicio: string;
   fecha_fin: string;
-  id_cajero?: number;
+  id_cajero?: string;
   id_producto?: number;
 }
 

@@ -170,7 +170,7 @@ export class UsuariosService {
   /**
    * Obtener usuario por ID
    */
-  async getUsuarioById(id: number): Promise<PerfilConRoles | null> {
+  async getUsuarioById(id: string): Promise<PerfilConRoles | null> {
     // Obtener perfil con rol
     const { data: perfil, error } = await supabase
       .from('perfil_usuario')
@@ -351,7 +351,7 @@ export class UsuariosService {
   /**
    * Actualizar usuario
    */
-  async updateUsuario(id: number, dto: UpdateUsuarioDTO): Promise<PerfilUsuario> {
+  async updateUsuario(id: string, dto: UpdateUsuarioDTO): Promise<PerfilUsuario> {
     const { logger } = await import('../utils/logger');
 
     // Filtrar campos que puedan causar problemas con triggers
@@ -511,14 +511,14 @@ export class UsuariosService {
   /**
    * Cambiar estado de usuario
    */
-  async cambiarEstado(id: number, estado: 'activo' | 'inactivo' | 'suspendido' | 'eliminado'): Promise<PerfilUsuario> {
+  async cambiarEstado(id: string, estado: 'activo' | 'inactivo' | 'suspendido' | 'eliminado'): Promise<PerfilUsuario> {
     return this.updateUsuario(id, { estado });
   }
 
   /**
    * Eliminar usuario (soft delete primero, hard delete después)
    */
-  async deleteUsuario(id: number): Promise<void> {
+  async deleteUsuario(id: string): Promise<void> {
     // Obtener el usuario actual para verificar su estado
     const usuario = await this.getUsuarioById(id);
     if (!usuario) {
@@ -546,7 +546,7 @@ export class UsuariosService {
   /**
    * Obtener roles de un usuario
    */
-  async getRolesByUsuario(idUsuario: number): Promise<unknown[]> {
+  async getRolesByUsuario(idUsuario: string): Promise<unknown[]> {
     const { data, error } = await supabase
       .from('perfil_usuario')
       .select(
@@ -568,7 +568,7 @@ export class UsuariosService {
   /**
    * Asignar rol a usuario
    */
-  async asignarRol(idUsuario: number, idRol: number): Promise<void> {
+  async asignarRol(idUsuario: string, idRol: number): Promise<void> {
     const { error } = await supabase
       .from('perfil_usuario')
       .update({ id_rol: idRol })

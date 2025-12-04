@@ -200,4 +200,18 @@ export class ClientesController {
       next(error);
     }
   }
+
+  async marcarTransferenciaPagada(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const idVenta = parseInt(req.params.idVenta);
+      await clientesService.marcarTransferenciaPagada(idVenta);
+
+      res.json({
+        success: true,
+        message: 'Transferencia marcada como pagada',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

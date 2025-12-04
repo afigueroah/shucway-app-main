@@ -17,7 +17,6 @@ const HistorialVentas: React.FC = () => {
     { value: 'Tarjeta', label: 'Tarjeta' },
     { value: 'Transferencia', label: 'Transferencia' },
     { value: 'Canje', label: 'Canje' },
-    { value: 'Cupon', label: 'Cupon' },
   ];
   const [sortBy, setSortBy] = useState<'id' | 'fecha' | 'total' | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');

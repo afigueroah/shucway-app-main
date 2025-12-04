@@ -36,7 +36,7 @@ export interface DepositoBanco {
 export interface ArqueoCaja {
   id_arqueo: number;
   fecha_arqueo: Date;
-  id_cajero?: number;
+  id_cajero?: string;
   efectivo_esperado: number;
   efectivo_contado: number;
   diferencia: number;

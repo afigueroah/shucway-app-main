@@ -6,7 +6,7 @@ const router = Router();
 
 router.use(authenticateToken);
 
-router.post('/:module', resetController.resetModule);
 router.post('/all', resetController.resetAll);
+router.post('/:module', resetController.resetModule);
 
 export default router;

@@ -15,7 +15,7 @@ export class VentasController {
       const estado = req.query.estado as string | undefined;
       const fechaInicio = req.query.fechaInicio as string | undefined;
       const fechaFin = req.query.fechaFin as string | undefined;
-      const idCajero = req.query.idCajero ? parseInt(req.query.idCajero as string) : undefined;
+      const idCajero = req.query.idCajero as string | undefined;
 
       const ventas = await ventasService.getVentas(estado, fechaInicio, fechaFin, idCajero);
 
@@ -166,7 +166,7 @@ export class VentasController {
 
   async getVentasDelDia(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const idCajero = req.query.idCajero ? parseInt(req.query.idCajero as string) : undefined;
+      const idCajero = req.query.idCajero as string | undefined;
       const ventas = await ventasService.getVentasDelDia(idCajero);
 
       const totalVentas = ventas.reduce((sum, v) => sum + (v.total_venta || 0), 0);
@@ -266,7 +266,7 @@ export class VentasController {
 
   async getVentasPorCajero(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const idCajero = parseInt(req.params.idCajero);
+      const idCajero = req.params.idCajero;
       const fechaInicio = req.query.fechaInicio as string | undefined;
       const fechaFin = req.query.fechaFin as string | undefined;
 

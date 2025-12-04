@@ -45,7 +45,7 @@ export class UsuariosController {
 
   async getUsuarioById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
       const usuario = await new UsuariosService().getUsuarioById(id);
 
       if (!usuario) {
@@ -91,7 +91,7 @@ export class UsuariosController {
 
   async updateUsuario(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
       // Filtrar cualquier campo relacionado con token
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { token, active_token, session_token, ...dto } = req.body;
@@ -149,7 +149,7 @@ export class UsuariosController {
 
   async cambiarEstado(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
       const { estado } = req.body;
 
       if (!['activo', 'inactivo', 'suspendido', 'eliminado'].includes(estado)) {
@@ -244,7 +244,7 @@ export class UsuariosController {
 
   async getRolesByUsuario(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
       const roles = await new UsuariosService().getRolesByUsuario(id);
 
       res.json({
@@ -258,7 +258,7 @@ export class UsuariosController {
 
   async asignarRol(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const idUsuario = parseInt(req.params.id);
+      const idUsuario = req.params.id;
       const { idRol } = req.body;
 
       if (!idRol) {
@@ -421,9 +421,9 @@ export class UsuariosController {
       logger.info(`[DELETE USUARIO] Intentando eliminar usuario con ID: ${req.params.id}`);
       logger.info(`[DELETE USUARIO] Usuario solicitante: ${req.user?.email} (Rol: ${req.user?.role?.nombre_rol}, Nivel: ${req.user?.role?.nivel_permisos})`);
 
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
 
-      if (isNaN(id)) {
+      if (!id) {
         logger.error(`[DELETE USUARIO] ID inválido: ${req.params.id}`);
         res.status(400).json({
           success: false,

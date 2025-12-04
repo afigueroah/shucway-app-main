@@ -22,11 +22,9 @@ export class StorageService {
     try {
       const { bucket, folder = '', fileName, contentType } = options;
 
-      // Generar nombre de archivo único si no se proporciona
       const finalFileName = fileName || `${Date.now()}_${Math.random().toString(36).substring(7)}`;
       const filePath = folder ? `${folder}/${finalFileName}` : finalFileName;
 
-      // Subir archivo usando Service Role Key (sin RLS)
       const { data, error } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, {

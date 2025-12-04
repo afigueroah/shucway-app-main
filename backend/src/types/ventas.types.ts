@@ -19,12 +19,16 @@ export interface Venta {
   tipo_pago: 'Cash' | 'Paggo' | 'Tarjeta' | 'Transferencia' | 'Canje' | 'Cupon';
   estado: 'pendiente' | 'confirmada' | 'completada' | 'cancelada';
   estado_transferencia?: 'esperando' | 'recibido';
-  id_cajero?: number;
+  id_cajero?: string;
   total_venta: number;
   total_costo: number;
   ganancia: number;
   notas?: string;
   productos_resumen?: string;
+  cliente?: {
+    nombre: string;
+    telefono?: string;
+  };
 }
 
 export interface DetalleVenta {

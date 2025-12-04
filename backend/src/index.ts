@@ -43,9 +43,9 @@ async function startServer() {
       logger.info(`Servidor corriendo en http://localhost:${config.port}`);
       logger.info(`Entorno: ${config.env}`);
       logger.info(`CORS habilitado para: ${config.cors.origin}`);
-      logger.info(`Base de datos: Supabase PostgreSQL (sin RLS)`);
+      logger.info(`Base de datos: Supabase PostgreSQL`);
       logger.info(`Storage: Supabase Storage`);
-      logger.info(`Autenticación: JWT personalizado (sin Supabase Auth)`);
+      logger.info(`Autenticación: JWT personalizado`);
       logger.info('Logs guardados en: ./logs/');
     });
 

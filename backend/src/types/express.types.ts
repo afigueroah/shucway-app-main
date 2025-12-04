@@ -5,7 +5,7 @@
 import { Request } from 'express';
 
 export interface AuthUser {
-  id_perfil: number;
+  id_perfil: string;
   nombre: string;
   email: string;
   username: string;

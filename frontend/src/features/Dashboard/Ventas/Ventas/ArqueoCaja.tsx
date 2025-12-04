@@ -8,6 +8,15 @@ import html2pdf from 'html2pdf.js';
 
 type RangeFilter = 'todo' | 'hoy' | 'ayer' | 'ultimos_7' | 'ultimos_30' | 'este_mes' | 'custom';
 
+interface Transferencia {
+  id_deposito?: string;
+  nombre_cliente?: string;
+  monto?: number;
+  numero_referencia?: string;
+  nombre_banco?: string;
+  tipo_pago?: string;
+}
+
 const ArqueoCaja: React.FC = () => {
   const [arqueos, setArqueos] = useState<Arqueo[]>([]);
   const [search, setSearch] = useState('');
@@ -25,7 +34,7 @@ const ArqueoCaja: React.FC = () => {
   // Datos para el reporte
   const [reporteData, setReporteData] = useState<{
     ventas: Venta[];
-    transferencias: Venta[];
+    transferencias: Transferencia[];
     ventasTotales: number;
     ventasEfectivo: number;
     transferTotal: number;
@@ -95,7 +104,7 @@ const ArqueoCaja: React.FC = () => {
       const fechaInicio = fechaDia + ' 00:00:00';
       const fechaFin = fechaDia + ' 23:59:59';
 
-      const ventas = await ventasService.getVentas('confirmada', fechaInicio, fechaFin);
+      const ventas = await ventasService.getVentas('confirmada', fechaInicio, fechaFin, arqueo.id_cajero || undefined);
 
       setReporteData({
         ventas,
@@ -347,7 +356,7 @@ function ArqueoReportModal({
   arqueo: Arqueo;
   reporteData: {
     ventas: Venta[];
-    transferencias: Venta[];
+    transferencias: Transferencia[];
     ventasTotales: number;
     ventasEfectivo: number;
     transferTotal: number;
@@ -370,9 +379,9 @@ function ArqueoReportModal({
       const opt = {
         margin: 1,
         filename: `arqueo-${arqueo.id_arqueo}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: "jpeg" as const, quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
       };
       html2pdf().set(opt).from(element).save();
     } catch (err) {
@@ -391,7 +400,7 @@ function ArqueoReportModal({
                 onClick={openPrintWindow}
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
               >
-                Imprimir PDF
+                Generar PDF
               </button>
               <button
                 onClick={onClose}
@@ -431,7 +440,7 @@ function PrintableArqueoSheet({
   arqueo: Arqueo;
   reporteData: {
     ventas: Venta[];
-    transferencias: Venta[];
+    transferencias: Transferencia[];
     ventasTotales: number;
     ventasEfectivo: number;
     transferTotal: number;

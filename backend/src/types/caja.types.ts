@@ -6,8 +6,8 @@ export type CajaEstado = 'abierta' | 'cerrada' | 'expirada';
 
 export interface CajaSesion {
   id_sesion: number;
-  id_cajero_apertura: number | null;
-  id_cajero_cierre: number | null;
+  id_cajero_apertura: string | null;
+  id_cajero_cierre: string | null;
   fecha_apertura: string;
   fecha_cierre: string | null;
   monto_inicial: number;
@@ -46,7 +46,7 @@ export interface CajaEstadoResponse {
 export interface Arqueo {
   id_arqueo: number;
   fecha_arqueo: string;
-  id_cajero: number | null;
+  id_cajero: string | null;
   billetes_100: number;
   billetes_50: number;
   billetes_20: number;

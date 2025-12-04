@@ -28,6 +28,12 @@ export const resetController = {
         case 'gastos':
           await resetService.resetGastos();
           break;
+        case 'arqueos':
+          await resetService.resetArqueos();
+          break;
+        case 'auditorias':
+          await resetService.resetAuditorias();
+          break;
         default:
           res.status(400).json({ message: 'Módulo no válido' });
           return;

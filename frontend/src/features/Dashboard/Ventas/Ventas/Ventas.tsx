@@ -334,7 +334,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
   // Drawer de pago
   const [openPago, setOpenPago] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
-  const [metodo, setMetodo] = useState<'efectivo' | 'transferencia' | 'canje_gratis' | 'cupon'>('efectivo');
+  const [metodo, setMetodo] = useState<'efectivo' | 'transferencia' | 'canje_gratis'>('efectivo');
   const [referencia, setReferencia] = useState('');
   const [banco, setBanco] = useState('');
 
@@ -1233,7 +1233,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
       const esDecimaCompra = clienteSeleccionado?.puntos_acumulados === 9;
       const ventaData: CreateVentaDTO = {
         id_cliente: clienteSeleccionado?.id_cliente,
-        tipo_pago: metodo === 'efectivo' ? 'Cash' : metodo === 'transferencia' ? 'Transferencia' : metodo === 'cupon' ? 'Cupon' : 'Paggo',
+        tipo_pago: metodo === 'efectivo' ? 'Cash' : metodo === 'transferencia' ? 'Transferencia' : 'Paggo',
         acumula_puntos: puntosEnabled,
         notas: notasVenta.trim() ? notasVenta.trim() : undefined,
         detalles: carrito.map((item) => ({
@@ -1970,7 +1970,7 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                 </div>
 
                 {/* Métodos de pago */}
-                <div className="mt-6 grid grid-cols-3 gap-3">
+                <div className="mt-6 grid grid-cols-2 gap-3">
                   <button
                     aria-pressed={metodo === 'efectivo'}
                     onClick={() => { setMetodo('efectivo'); setPagoError(''); setCashInvalid(false); }}
@@ -1992,17 +1992,6 @@ const Ventas: React.FC<{ onBack?: () => void }> = () => {
                     }`}
                   >
                     TRANSFERENCIA
-                  </button>
-                  <button
-                    aria-pressed={metodo === 'cupon'}
-                    onClick={() => { setMetodo('cupon'); setPagoError(''); setCashInvalid(false); }}
-                    className={`h-12 rounded-lg px-4 font-semibold text-xl border transition ${
-                      metodo === 'cupon'
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-inner'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    CUPÓN
                   </button>
                 </div>
 

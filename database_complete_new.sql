@@ -2608,3 +2608,24 @@ EXECUTE FUNCTION fn_bitacora_ventas();
 
 -- Agregar columna transferencias a arqueo_caja si no existe
 ALTER TABLE arqueo_caja ADD COLUMN IF NOT EXISTS transferencias JSONB DEFAULT '[]'::jsonb;
+
+-- Agregar columna id_sesion a arqueo_caja para relacionarla con caja_sesion
+ALTER TABLE arqueo_caja ADD COLUMN IF NOT EXISTS id_sesion INTEGER REFERENCES caja_sesion(id_sesion);
+
+-- FUNCIÓN PARA OBTENER DEFINICIONES COMPLETAS DE TRIGGERS
+CREATE OR REPLACE FUNCTION get_trigger_definitions()
+RETURNS TABLE(trigger_name TEXT, definition TEXT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        t.tgname::TEXT as trigger_name,
+        pg_get_triggerdef(t.oid)::TEXT as definition
+    FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND t.tgenabled = 'O'
+    AND t.tgisconstraint = false
+    ORDER BY t.tgname;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -18,9 +18,9 @@ import {
   Users,
   X,
   Star,
+  CheckCircle,
 } from "lucide-react";
-import { clientesService, type Cliente } from "../../../api/clientesService";
-import { ventasService } from "../../../api/ventasService";
+import { clientesService, type Cliente, type TransferenciaPendiente } from "../../../api/clientesService";
 import { localStore } from "../../../utils/storage";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
@@ -78,7 +78,7 @@ export default function Clientes() {
   const [puntosEnabled, setPuntosEnabled] = useState(() => localStore.get('puntosEnabled', false));
   const [deudasModalOpen, setDeudasModalOpen] = useState(false);
   const [clienteDeudas, setClienteDeudas] = useState<Cliente | null>(null);
-  const [transferenciasPendientes, setTransferenciasPendientes] = useState<any[]>([]);
+  const [transferenciasPendientes, setTransferenciasPendientes] = useState<TransferenciaPendiente[]>([]);
   const [cargandoDeudas, setCargandoDeudas] = useState(false);
 
   useEffect(() => {
@@ -273,10 +273,10 @@ export default function Clientes() {
     }
   };
 
-  const eliminarDeuda = async (transferencia: any) => {
+  const marcarComoPagada = async (transferencia: TransferenciaPendiente) => {
     try {
-      await ventasService.updateEstadoTransferencia(transferencia.id_venta, { estado: 'recibido' });
-      message.success('Deuda marcada como pagada');
+      await clientesService.marcarTransferenciaPagada(transferencia.id_venta);
+      message.success('Transferencia marcada como pagada');
       
       // Recargar las deudas
       if (clienteDeudas) {
@@ -284,8 +284,8 @@ export default function Clientes() {
         setTransferenciasPendientes(transferencias);
       }
     } catch (error) {
-      console.error('Error eliminando deuda:', error);
-      message.error('Error al marcar la deuda como pagada');
+      console.error('Error marcando transferencia como pagada:', error);
+      message.error('Error al marcar la transferencia como pagada');
     }
   };
 
@@ -1337,24 +1337,45 @@ export default function Clientes() {
                                 Q{transferencia.total_venta?.toFixed(2)}
                               </p>
                               <button
-                                onClick={() => eliminarDeuda(transferencia)}
-                                className="text-red-500 hover:text-red-700 mt-1"
-                                title="Marcar deuda como pagada"
+                                onClick={() => marcarComoPagada(transferencia)}
+                                className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-medium rounded-lg shadow-md hover:from-orange-600 hover:to-orange-700 transform hover:scale-105 transition-all duration-200 border border-orange-400"
+                                title="Marcar como pagada"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <CheckCircle className="w-4 h-4" />
+                                Pagado
                               </button>
                             </div>
                           </div>
 
                           <div className="mt-3 p-3 bg-white rounded border">
-                            <p className="text-sm font-medium text-gray-700 mb-1">
-                              Estado de Transferencia
-                            </p>
-                            <div className="text-sm">
-                              <span className="text-gray-500">Estado:</span>
-                              <span className="ml-2 font-medium text-orange-600">
-                                {transferencia.estado_transferencia === 'esperando' ? 'Esperando recepción' : transferencia.estado_transferencia}
-                              </span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-gray-700 mb-1">
+                                  Número de Referencia
+                                </p>
+                                <p className="text-sm text-gray-900">
+                                  {transferencia.numero_referencia || 'No especificado'}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-700 mb-1">
+                                  Banco de Origen
+                                </p>
+                                <p className="text-sm text-gray-900">
+                                  {transferencia.nombre_banco || 'No especificado'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-3">
+                              <p className="text-sm font-medium text-gray-700 mb-1">
+                                Estado de Transferencia
+                              </p>
+                              <div className="text-sm">
+                                <span className="text-gray-500">Estado:</span>
+                                <span className="ml-2 font-medium text-orange-600">
+                                  {transferencia.estado_transferencia === 'esperando' ? 'Esperando recepción' : transferencia.estado_transferencia}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>

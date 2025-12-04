@@ -3,11 +3,13 @@ import { config } from '../config/env';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-async function runMigration() {
+async function runMigration(migrationFile?: string) {
   let pool: Pool | null = null;
 
   try {
-    console.log('🚀 Ejecutando migración: fix_historial_puntos_constraint');
+    // Usar el archivo especificado o el predeterminado
+    const fileName = migrationFile || '20251130_add_id_sesion_to_arqueo_caja.sql';
+    console.log(`🚀 Ejecutando migración: ${fileName}`);
 
     // Verificar que tenemos las credenciales de PostgreSQL
     if (!config.supabase.dbHost || !config.supabase.dbUser || !config.supabase.dbPassword) {
@@ -27,7 +29,7 @@ async function runMigration() {
     });
 
     // Leer el archivo de migración
-    const migrationPath = join(__dirname, '../../../migrations/20251119_fix_historial_puntos_constraint.sql');
+    const migrationPath = join(__dirname, '../../migrations', fileName);
     const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
     console.log('📄 Contenido de la migración:');
@@ -54,7 +56,8 @@ async function runMigration() {
 
 // Ejecutar si se llama directamente
 if (require.main === module) {
-  runMigration();
+  const migrationFile = process.argv[2]; // Tomar el nombre del archivo como argumento
+  runMigration(migrationFile);
 }
 
 export { runMigration };

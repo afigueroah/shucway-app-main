@@ -12,8 +12,6 @@ export const MetodoIcon: React.FC<{ metodo: string; className?: string }> = ({ m
       return <Landmark className={className} strokeWidth={2} />;
     case 'Canje':
       return <Star className={className} strokeWidth={2} />;
-    case 'Cupon':
-      return <Gift className={className} strokeWidth={2} />;
     default:
       return <Banknote className={className} strokeWidth={2} />;
   }

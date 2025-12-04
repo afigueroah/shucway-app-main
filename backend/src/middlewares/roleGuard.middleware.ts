@@ -84,7 +84,7 @@ export const requireOwnerOrPropietario = (userIdParam: string = 'id') => {
       }
 
       const userLevel = user.role?.nivel_permisos || 0;
-      const targetUserId = parseInt(req.params[userIdParam]);
+      const targetUserId = req.params[userIdParam];
 
       // Es propietario O está accediendo a su propio perfil
       if (userLevel >= PermissionLevel.PROPIETARIO || user.id_perfil === targetUserId) {

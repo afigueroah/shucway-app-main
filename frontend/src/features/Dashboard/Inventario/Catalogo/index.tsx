@@ -775,19 +775,25 @@ export default function Catalogo() {
       <AnimatePresence>
         {deleteModal.open && deleteModal.row && (
           <motion.div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="bg-white rounded-xl shadow-xl p-7 max-w-md w-full border">
+            <motion.div
+              className="bg-white rounded-xl shadow-xl p-7 max-w-md w-full border"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
               <div className="text-lg font-bold mb-2 text-gray-800">¿Eliminar insumo?</div>
               <div className="mb-4 text-gray-700">Esta acción no se puede deshacer.<br />¿Seguro que deseas eliminar <span className="font-semibold">{deleteModal.row.nombre}</span>?</div>
               <div className="flex gap-3 justify-end">
                 <button className="h-10 px-4 rounded-lg border text-sm font-semibold hover:bg-gray-50" onClick={() => setDeleteModal({ open: false, row: null })}>Cancelar</button>
                 <button className="h-10 px-4 rounded-lg bg-rose-600 text-white font-semibold hover:bg-rose-700" onClick={confirmDeleteRow} disabled={loading}>{loading ? "Eliminando..." : "Eliminar"}</button>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

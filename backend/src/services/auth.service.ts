@@ -12,7 +12,7 @@ import {
 } from '../types';
 
 interface DatabaseUser {
-  id_perfil: number;
+  id_perfil: string;
   nombre: string;
   email: string;
   username: string;
@@ -196,7 +196,7 @@ export class AuthService {
   }
 
   // Usuario con rol
-  private async getUserWithRol(userId: number): Promise<UsuarioConRol> {
+  private async getUserWithRol(userId: string): Promise<UsuarioConRol> {
     const { data: user, error: userError } = await supabase
       .from('perfil_usuario')
       .select(`

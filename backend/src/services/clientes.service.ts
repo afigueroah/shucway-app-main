@@ -202,7 +202,9 @@ export class ClientesService {
         id_venta,
         fecha_venta,
         total_venta,
-        estado_transferencia
+        estado_transferencia,
+        numero_referencia,
+        nombre_banco
       `)
       .eq('id_cliente', idCliente)
       .eq('tipo_pago', 'Transferencia')
@@ -211,6 +213,52 @@ export class ClientesService {
 
     if (error) throw new Error(`Error al obtener transferencias pendientes: ${error.message}`);
     return data || [];
+  }
+
+  /**
+   * Marcar una transferencia como pagada
+   */
+  async marcarTransferenciaPagada(idVenta: number): Promise<void> {
+    // Primero obtener los datos de la venta
+    const { data: venta, error: ventaError } = await supabase
+      .from('venta')
+      .select('id_cliente, total_venta, numero_referencia, nombre_banco, id_cajero')
+      .eq('id_venta', idVenta)
+      .eq('tipo_pago', 'Transferencia')
+      .eq('estado_transferencia', 'esperando')
+      .single();
+
+    if (ventaError || !venta) {
+      throw new Error(`Error al obtener datos de la venta: ${ventaError?.message || 'Venta no encontrada'}`);
+    }
+
+    // Actualizar el estado de la transferencia
+    const { error: updateError } = await supabase
+      .from('venta')
+      .update({ estado_transferencia: 'recibido' })
+      .eq('id_venta', idVenta);
+
+    if (updateError) {
+      throw new Error(`Error al actualizar estado de transferencia: ${updateError.message}`);
+    }
+
+    // Insertar en deposito_banco
+    const { error: depositoError } = await supabase
+      .from('deposito_banco')
+      .insert({
+        descripcion: `Pago por venta #${idVenta}`,
+        tipo_pago: 'Transferencia',
+        monto: venta.total_venta,
+        id_perfil: venta.id_cajero,
+        numero_referencia: venta.numero_referencia,
+        nombre_banco: venta.nombre_banco,
+        nombre_cliente: 'Cliente pendiente' // Se puede mejorar para obtener el nombre real
+      });
+
+    if (depositoError) {
+      console.error(`Error al insertar depósito bancario: ${depositoError.message}`);
+      // No lanzamos error aquí para no revertir el cambio de estado
+    }
   }
   async getProductoFavorito(idCliente: number): Promise<{ producto: string; cantidad: number } | null> {
     // First get venta ids for the client

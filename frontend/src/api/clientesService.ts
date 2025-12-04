@@ -26,6 +26,17 @@ export interface Cliente {
   cantidad_transferencias_pendientes?: number;
 }
 
+export interface TransferenciaPendiente {
+  id_venta: number;
+  fecha_venta: string;
+  total_venta: number;
+  tipo_pago: string;
+  estado: string;
+  numero_referencia?: string;
+  nombre_banco?: string;
+  estado_transferencia?: string;
+}
+
 export const clientesService = {
   // Obtener todos los clientes
   async getClientes(): Promise<Cliente[]> {
@@ -119,12 +130,22 @@ export const clientesService = {
   },
 
   // Obtener transferencias pendientes de un cliente
-  async getTransferenciasPendientes(idCliente: number): Promise<any[]> {
+  async getTransferenciasPendientes(idCliente: number): Promise<TransferenciaPendiente[]> {
     try {
       const response = await apiClient.get(`/clientes/${idCliente}/transferencias-pendientes`);
       return response.data.data;
     } catch (error) {
       console.error('Error obteniendo transferencias pendientes:', error);
+      throw error;
+    }
+  },
+
+  // Marcar transferencia como pagada
+  async marcarTransferenciaPagada(idVenta: number): Promise<void> {
+    try {
+      await apiClient.post(`/clientes/transferencias/${idVenta}/pagada`);
+    } catch (error) {
+      console.error('Error marcando transferencia como pagada:', error);
       throw error;
     }
   },

@@ -70,7 +70,7 @@ interface SchemaSqlPayload {
   details?: string;
 }
 
-export type IncrementalTableKey = 'insumo' | 'venta' | 'gasto_operativo';
+export type IncrementalTableKey = 'inventario' | 'ventas' | 'compras' | 'gastos' | 'usuarios' | 'caja';
 
 interface IncrementalSqlPayload {
   success?: boolean;
@@ -94,9 +94,12 @@ const MAX_HISTORY_ITEMS = 10;
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 const INCREMENTAL_OPTIONS: { value: IncrementalTableKey; label: string }[] = [
-  { value: 'insumo', label: 'Insumos' },
-  { value: 'venta', label: 'Ventas' },
-  { value: 'gasto_operativo', label: 'Gastos operativos' },
+  { value: 'inventario', label: 'Inventario' },
+  { value: 'ventas', label: 'Ventas' },
+  { value: 'compras', label: 'Compras' },
+  { value: 'gastos', label: 'Gastos Operativos' },
+  { value: 'usuarios', label: 'Usuarios' },
+  { value: 'caja', label: 'Caja' },
 ];
 
 const createId = () =>
@@ -109,8 +112,9 @@ const sanitizeFilenameFragment = (value: string) => value.replace(/[:.]/g, '-');
 const composeSchemaSql = (payload: SchemaSqlPayload): string => {
   const sections: string[] = [];
 
-  sections.push('-- SHUCWAY ERP - Backup de estructura');
+  sections.push('-- SHUCWAY ERP - Backup Completo con Datos');
   sections.push(`-- Generado: ${payload.generatedAt}`);
+  sections.push('-- Este archivo incluye la estructura completa de la base de datos y TODOS los datos actuales');
   sections.push('');
 
   if (payload.tables.length) {
@@ -330,19 +334,19 @@ const Backup: React.FC = () => {
 
     const sql = composeSchemaSql(schemaData);
     const timestamp = sanitizeFilenameFragment(schemaData.generatedAt || new Date().toISOString());
-    const filename = `backup-estructura-${timestamp}.sql`;
+    const filename = `backup-completo-${timestamp}.sql`;
 
     const sizeBytes = downloadTextFile(sql, filename);
     registerHistory({
       id: createId(),
       type: 'schema',
-      label: 'Estructura completa',
+      label: 'Backup Completo',
       createdAt: new Date().toISOString(),
       filename,
       sizeBytes,
       sourceGeneratedAt: schemaData.generatedAt,
     });
-    messageApi.success('Estructura exportada en formato SQL.');
+    messageApi.success('Backup completo exportado exitosamente con toda la estructura y datos.');
   }, [schemaData, downloadTextFile, registerHistory, messageApi]);
 
   const downloadIncremental = useCallback(
@@ -533,24 +537,25 @@ const Backup: React.FC = () => {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-xl space-y-2">
                   <Text strong className="text-emerald-700">
-                    Respaldo de estructura
+                    Backup Completo
                   </Text>
                   <Paragraph className="!mb-0 text-sm text-emerald-900/75">
-                    Exporta la definición completa de tu base de datos incluyendo tablas, triggers y funciones. Ideal
-                    para migraciones o restauraciones totales.
+                    Exporta la definición completa de tu base de datos incluyendo tablas, triggers, funciones y TODOS los datos actuales. Ideal para migraciones completas o restauraciones totales con información actual.
                   </Paragraph>
                 </div>
-                <Tooltip title="Descargar SQL completo">
-                  <Button
-                    type="primary"
-                    shape="circle"
-                    icon={<DownloadOutlined />}
-                    className="border-0 bg-emerald-600 hover:bg-emerald-700"
-                    onClick={handleDownloadSchema}
-                    loading={schemaLoading}
-                    disabled={schemaLoading || !schemaData}
-                  />
-                </Tooltip>
+                <Button
+                  type="primary"
+                  size="large"
+                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 focus:from-emerald-600 focus:to-emerald-700 active:from-emerald-700 active:to-emerald-800 border-0 shadow-lg hover:shadow-xl focus:shadow-xl active:shadow-xl transform hover:scale-105 focus:scale-105 active:scale-105 transition-all duration-200"
+                  onClick={handleDownloadSchema}
+                  loading={schemaLoading}
+                  disabled={schemaLoading || !schemaData}
+                >
+                  <div className="flex items-center gap-2">
+                    <DownloadOutlined className="text-lg" />
+                    <span className="font-semibold">Backup Completo</span>
+                  </div>
+                </Button>
               </div>
               {schemaError ? <Alert type="error" message={schemaError} showIcon className="mt-4" /> : null}
             </section>

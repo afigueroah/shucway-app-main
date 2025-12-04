@@ -4,7 +4,7 @@ import { Request } from 'express';
 
 // Usuario autenticado
 export interface AuthUser {
-  id_perfil: number;
+  id_perfil: string;
   email: string;
   rol: string;
 }

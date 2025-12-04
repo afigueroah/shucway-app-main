@@ -18,7 +18,9 @@ import {
   Trash2,
   Wallet,
   X,
+  RotateCcw,
 } from "lucide-react";
+import { localStore } from "../../../utils/storage";
 import gastosOperativosService, {
   CategoriaGasto,
   CreateGastoDTO,
@@ -119,6 +121,9 @@ export default function GastosOperativos() {
   const [deletingGasto, setDeletingGasto] = useState<GastoOperativo | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData(true);
@@ -398,6 +403,45 @@ export default function GastosOperativos() {
     }
   };
 
+  const openResetModal = () => {
+    setResetError(null);
+    setResetModalOpen(true);
+  };
+
+  const closeResetModal = () => {
+    setResetModalOpen(false);
+    setResetting(false);
+    setResetError(null);
+  };
+
+  const handleResetConfirm = async () => {
+    try {
+      setResetError(null);
+      setResetting(true);
+      const response = await fetch('/api/reset/gastos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStore.get('access_token')}`,
+        },
+      });
+
+      if (response.ok) {
+        await loadData();
+        closeResetModal();
+        message.success('Módulo gastos operativos reiniciado exitosamente');
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al reiniciar gastos operativos');
+      }
+    } catch (err) {
+      const message_text = err instanceof Error ? err.message : "No se pudo reiniciar los gastos operativos";
+      setResetting(false);
+      setResetError(message_text);
+      message.error(`Error al reiniciar gastos operativos: ${message_text}`);
+    }
+  };
+
   const handleExportCSV = () => {
     const header = [
       "Referencia",
@@ -606,6 +650,12 @@ export default function GastosOperativos() {
               className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
             >
               <Plus className="h-4 w-4" /> Nuevo gasto
+            </button>
+            <button
+              onClick={openResetModal}
+              className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 transition hover:border-red-300 hover:bg-red-50"
+            >
+              <RotateCcw className="h-4 w-4" /> Reinicio de datos
             </button>
           </div>
         </header>
@@ -1396,6 +1446,64 @@ export default function GastosOperativos() {
                     disabled={deleting}
                   >
                     {deleting ? "Eliminando..." : "Eliminar"}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {resetModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-red-100 p-2 text-red-600">
+                    <RotateCcw className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Reinicio de datos de gastos operativos</h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Esta acción eliminará definitivamente todos los gastos operativos registrados en el sistema.
+                    </p>
+                    <div className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700 border border-red-200">
+                      <p className="font-medium text-red-900">⚠️ Acción irreversible</p>
+                      <p className="mt-1 text-xs text-red-600">
+                        Se eliminarán {gastos.length} registros de gastos operativos. Esta acción no se puede deshacer.
+                      </p>
+                    </div>
+                    {resetError && (
+                      <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        {resetError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeResetModal}
+                    className="rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-emerald-200 hover:text-emerald-600"
+                    disabled={resetting}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetConfirm}
+                    className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                    disabled={resetting}
+                  >
+                    {resetting ? "Reiniciando..." : "Reiniciar datos"}
                   </button>
                 </div>
               </motion.div>

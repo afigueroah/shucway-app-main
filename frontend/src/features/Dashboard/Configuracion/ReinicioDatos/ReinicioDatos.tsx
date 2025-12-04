@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Button, Select, Modal, message, Spin } from 'antd';
 import { DeleteOutlined, ArrowLeftOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { localStore } from '../../../../utils/storage';
+import { useNotifications } from '@/hooks/useNotifications';
+import { NotificationContainer } from '@/components/NotificationContainer';
 
 const { Option } = Select;
 const { confirm } = Modal;
@@ -10,6 +13,7 @@ const ReinicioDatos: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [selectedModule, setSelectedModule] = useState<string>('');
+  const { addNotification, notifications, removeNotification } = useNotifications();
 
   const showConfirm = (title: string, content: string, onConfirm: () => void) => {
     confirm({
@@ -32,12 +36,18 @@ const ReinicioDatos: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStore.get('access_token')}`,
         },
       });
 
       if (response.ok) {
-        message.success(`Módulo ${module} reiniciado exitosamente`);
+        const moduleName = modules.find(m => m.key === module)?.name || module;
+        addNotification({
+          type: 'success',
+          title: 'Módulo reiniciado',
+          message: `El módulo ${moduleName} ha sido reiniciado exitosamente`,
+          duration: 5000
+        });
       } else {
         const error = await response.json();
         message.error(error.message || `Error al reiniciar ${module}`);
@@ -52,16 +62,21 @@ const ReinicioDatos: React.FC = () => {
   const resetAll = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/reset/all/reset', {
+      const response = await fetch('/api/reset/all', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStore.get('access_token')}`,
         },
       });
 
       if (response.ok) {
-        message.success('Todos los módulos reiniciados exitosamente (excepto perfil_usuario)');
+        addNotification({
+          type: 'success',
+          title: 'Limpieza total completada',
+          message: 'Todos los módulos han sido reiniciados exitosamente (excepto rol_usuario, perfil_usuario y bitacora_seguridad). Se eliminaron depósitos bancarios, bitácoras de insumo y sesiones de caja.',
+          duration: 5000
+        });
       } else {
         const error = await response.json();
         message.error(error.message || 'Error al reiniciar todos los módulos');
@@ -74,13 +89,15 @@ const ReinicioDatos: React.FC = () => {
   };
 
   const modules = [
-    { key: 'ventas', name: 'Ventas', description: 'Eliminar todas las ventas y detalles' },
-    { key: 'inventario', name: 'Inventario', description: 'Eliminar movimientos de inventario' },
-    { key: 'productos', name: 'Productos', description: 'Eliminar productos y variantes' },
-    { key: 'compras', name: 'Compras', description: 'Eliminar órdenes de compra y recepciones' },
-    { key: 'clientes', name: 'Clientes', description: 'Eliminar clientes' },
-    { key: 'proveedores', name: 'Proveedores', description: 'Eliminar proveedores' },
-    { key: 'gastos', name: 'Gastos Operativos', description: 'Eliminar gastos operativos' },
+    { key: 'ventas', name: 'Ventas', description: 'Eliminar todas las ventas y detalles de venta' },
+    { key: 'inventario', name: 'Inventario', description: 'Eliminar movimientos, lotes, presentaciones, insumos y categorías de inventario' },
+    { key: 'productos', name: 'Productos', description: 'Eliminar productos, variantes, recetas y categorías de productos' },
+    { key: 'compras', name: 'Compras', description: 'Eliminar órdenes de compra, recepciones y detalles de recepción' },
+    { key: 'clientes', name: 'Clientes', description: 'Eliminar clientes, ventas relacionadas, detalles de venta e historial de puntos' },
+    { key: 'proveedores', name: 'Proveedores', description: 'Eliminar proveedores, órdenes de compra, recepciones y detalles relacionados' },
+    { key: 'gastos', name: 'Gastos Operativos', description: 'Eliminar gastos operativos y categorías de gasto' },
+    { key: 'arqueos', name: 'Arqueos de Caja', description: 'Eliminar arqueos de caja y transferencias relacionadas' },
+    { key: 'auditorias', name: 'Auditorías', description: 'Eliminar auditorías de inventario y registros relacionados' },
   ];
 
   const selectedModuleData = modules.find(m => m.key === selectedModule);
@@ -170,8 +187,7 @@ const ReinicioDatos: React.FC = () => {
                     <div>
                       <h3 className="font-semibold text-red-800">Advertencia</h3>
                       <p className="text-sm text-red-700 mt-1">
-                        Esta opción reiniciará todos los módulos excepto el perfil de usuario. 
-                        Todos los datos operativos serán eliminados permanentemente.
+                        Esta opción reiniciará todos los módulos excepto los perfiles de usuario, roles y bitácora de seguridad.
                       </p>
                     </div>
                   </div>
@@ -197,7 +213,7 @@ const ReinicioDatos: React.FC = () => {
                   onClick={() =>
                     showConfirm(
                       'Limpieza Total',
-                      '¿Estás seguro de que quieres realizar una limpieza total? Todos los datos serán eliminados permanentemente, excepto los perfiles de usuario.',
+                      '¿Estás seguro de que quieres realizar una limpieza total? Todos los datos serán eliminados permanentemente, excepto los perfiles de usuario, roles y bitácora de seguridad.',
                       resetAll
                     )
                   }
@@ -212,6 +228,10 @@ const ReinicioDatos: React.FC = () => {
           </div>
         </Spin>
       </div>
+      <NotificationContainer
+        notifications={notifications}
+        onClose={removeNotification}
+      />
     </div>
   );
 };

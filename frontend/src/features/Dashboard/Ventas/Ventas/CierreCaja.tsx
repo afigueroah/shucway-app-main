@@ -7,6 +7,7 @@ import { MdPointOfSale, MdPrint } from "react-icons/md";
 import { cajaService, type CajaSesion } from "../../../../api/cajaService";
 import { ventasService, type Venta, type VentaTransferencia } from "../../../../api/ventasService";
 import { useAuth } from "../../../../hooks/useAuth";
+import { useNotifications } from "../../../../hooks/useNotifications";
 import html2pdf from 'html2pdf.js';
 
 /* ================= Paleta ================= */
@@ -101,6 +102,7 @@ const CierreCaja: React.FC = () => {
   const location = useLocation();
   const formRef = useRef<HTMLDivElement | null>(null);
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
 
   const [sesionCaja, setSesionCaja] = useState<CajaSesion | null>(null);
 
@@ -375,7 +377,21 @@ const CierreCaja: React.FC = () => {
 
   const resetSesionCaja = useCallback(async () => {
     try {
-      await cajaService.cerrarCaja();
+      // Cerrar caja con datos básicos del arqueo para reset
+      await cajaService.cerrarCaja({
+        monto_cierre: efectivoContado || 0,
+        observaciones: 'Reset forzado de sesión de caja',
+        arqueo: {
+          billetes_100: arqueo['100'] || 0,
+          billetes_50: arqueo['50'] || 0,
+          billetes_20: arqueo['20'] || 0,
+          billetes_10: arqueo['10'] || 0,
+          billetes_5: arqueo['5'] || 0,
+          monedas_1: arqueo['1'] || 0,
+          monedas_050: arqueo['0.5'] || 0,
+          monedas_025: arqueo['0.25'] || 0,
+        },
+      });
     } catch (error) {
       console.warn("No se pudo cerrar la caja de manera forzada:", error);
     } finally {
@@ -387,7 +403,7 @@ const CierreCaja: React.FC = () => {
       setToast("Sesion de caja reiniciada.");
       setTimeout(() => setToast(null), 2500);
     }
-  }, [refreshEstado, resetFormulario]);
+  }, [efectivoContado, arqueo, resetFormulario, refreshEstado]);
 
   const cerrarCaja = async () => {
     if (cerrando) {
@@ -408,6 +424,22 @@ const CierreCaja: React.FC = () => {
       await cajaService.cerrarCaja({
         monto_cierre: efectivoContado,
         observaciones: observacionesArqueo.trim() || undefined,
+        arqueo: {
+          billetes_100: arqueo['100'] || 0,
+          billetes_50: arqueo['50'] || 0,
+          billetes_20: arqueo['20'] || 0,
+          billetes_10: arqueo['10'] || 0,
+          billetes_5: arqueo['5'] || 0,
+          monedas_1: arqueo['1'] || 0,
+          monedas_050: arqueo['0.5'] || 0,
+          monedas_025: arqueo['0.25'] || 0,
+        },
+      });
+      addNotification({
+        type: 'success',
+        title: 'Caja cerrada correctamente',
+        message: 'Los datos han sido agregados al historial de arqueos de caja.',
+        duration: 3000
       });
       resetFormulario();
       setSesionCaja(null);

@@ -33,7 +33,7 @@ type SchemaSnippet = {
   definition: string;
 };
 
-type IncrementalTableKey = 'insumo' | 'venta' | 'gasto_operativo';
+type IncrementalTableKey = 'inventario' | 'ventas' | 'compras' | 'gastos' | 'usuarios' | 'caja';
 
 const schemaPathCandidates = [
   path.resolve(process.cwd(), 'database_complete_new.sql'),
@@ -94,19 +94,29 @@ const extractTableSnippets = (content: string): SchemaSnippet[] => {
 const extractInsertStatements = (content: string): string[] =>
   Array.from(content.matchAll(/INSERT\s+INTO[\s\S]+?;\s*/gi)).map((item) => item[0].trim());
 
-const extractTriggerSnippets = (content: string): SchemaSnippet[] => {
-  const triggers: SchemaSnippet[] = [];
-  const triggerRegex = /CREATE\s+TRIGGER\s+[\s\S]+?;\s*/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = triggerRegex.exec(content)) !== null) {
-    const definition = match[0].trim();
-    const nameMatch = definition.match(/CREATE\s+TRIGGER\s+([\w."-]+)/i);
-    const name = nameMatch?.[1]?.replace(/"/g, '') ?? `trigger_${triggers.length + 1}`;
-    triggers.push({ name, definition });
+const extractTriggerSnippets = async (): Promise<SchemaSnippet[]> => {
+  try {
+    const { data, error } = await supabase.rpc('get_trigger_definitions');
+    if (error) {
+      logger.warn('Error obteniendo triggers de BD, usando archivo SQL:', error.message);
+      // Fallback al archivo
+      const content = await readSchemaFile();
+      const triggers: SchemaSnippet[] = [];
+      const triggerRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+[\s\S]+?;\s*/gi;
+      let match: RegExpExecArray | null;
+      while ((match = triggerRegex.exec(content)) !== null) {
+        const definition = match[0].trim();
+        const nameMatch = definition.match(/CREATE\s+(?:OR\s+REPLACE\s+)?TRIGGER\s+([\w."-]+)/i);
+        const name = nameMatch?.[1]?.replace(/"/g, '') ?? `trigger_${triggers.length + 1}`;
+        triggers.push({ name, definition });
+      }
+      return triggers;
+    }
+    return data.map((row: any) => ({ name: row.trigger_name, definition: row.definition }));
+  } catch (error) {
+    logger.warn('Error obteniendo triggers:', error);
+    return [];
   }
-
-  return triggers;
 };
 
 const extractFunctionSnippets = (content: string): SchemaSnippet[] => {
@@ -141,6 +151,48 @@ const extractFunctionSnippets = (content: string): SchemaSnippet[] => {
   }
 
   return functions;
+};
+
+const extractIndexSnippets = (content: string): SchemaSnippet[] => {
+  const indexes: SchemaSnippet[] = [];
+  const indexRegex = /CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w."]+)\s+ON\s+([\w."]+)\s*\([\s\S]*?\);/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = indexRegex.exec(content)) !== null) {
+    const definition = match[0].trim();
+    const name = match[1]?.replace(/"/g, '') ?? `index_${indexes.length + 1}`;
+    indexes.push({ name, definition });
+  }
+
+  return indexes;
+};
+
+const extractViewSnippets = (content: string): SchemaSnippet[] => {
+  const views: SchemaSnippet[] = [];
+  const viewRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+([\w."]+)\s+AS[\s\S]*?;\s*/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = viewRegex.exec(content)) !== null) {
+    const definition = match[0].trim();
+    const name = match[1]?.replace(/"/g, '') ?? `view_${views.length + 1}`;
+    views.push({ name, definition });
+  }
+
+  return views;
+};
+
+const extractAlterTableSnippets = (content: string): SchemaSnippet[] => {
+  const alters: SchemaSnippet[] = [];
+  const alterRegex = /ALTER\s+TABLE\s+([\w."]+)\s+[^;]+;/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = alterRegex.exec(content)) !== null) {
+    const definition = match[0].trim();
+    const tableName = match[1]?.replace(/"/g, '') ?? 'unknown_table';
+    alters.push({ name: `alter_${tableName}`, definition });
+  }
+
+  return alters;
 };
 
 const formatSqlValue = (value: unknown): string => {
@@ -379,19 +431,136 @@ export const getIncrementalBackup = async (req: Request, res: Response) => {
   }
 };
 
+const generateAllDataInserts = async (): Promise<string[]> => {
+  const inserts: string[] = [];
+
+  // Lista de todas las tablas importantes en orden de dependencia
+  const tables = [
+    'rol_usuario',
+    'perfil_usuario',
+    'bitacora_seguridad',
+    'categoria_insumo',
+    'proveedor',
+    'insumo',
+    'insumo_presentacion',
+    'lote_insumo',
+    'categoria_producto',
+    'producto',
+    'producto_variante',
+    'receta_detalle',
+    'cliente',
+    'categoria_gasto',
+    'gasto_operativo',
+    'arqueo_caja',
+    'deposito_banco',
+    'venta',
+    'detalle_venta',
+    'orden_compra',
+    'detalle_orden_compra',
+    'recepcion_mercaderia',
+    'detalle_recepcion_mercaderia',
+    'historial_puntos',
+    'movimiento_inventario',
+    'bitacora_inventario',
+    'bitacora_ventas',
+    'bitacora_ordenes_compra',
+    'bitacora_productos',
+    'auditoria_inventario',
+    'auditoria_detalle',
+    'bitacora_auditoria',
+    'caja_sesion'
+  ];
+
+  for (const tableName of tables) {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .order(tableName === 'venta' ? 'fecha_venta' :
+               tableName === 'gasto_operativo' ? 'fecha_gasto' :
+               tableName === 'arqueo_caja' ? 'fecha_arqueo' :
+               tableName === 'deposito_banco' ? 'fecha_deposito' :
+               tableName === 'orden_compra' ? 'fecha_orden' :
+               tableName === 'recepcion_mercaderia' ? 'fecha_recepcion' :
+               tableName === 'movimiento_inventario' ? 'fecha_movimiento' :
+               tableName === 'bitacora_inventario' ? 'fecha_accion' :
+               tableName === 'bitacora_ventas' ? 'fecha_accion' :
+               tableName === 'bitacora_ordenes_compra' ? 'fecha_accion' :
+               tableName === 'bitacora_productos' ? 'fecha_accion' :
+               tableName === 'auditoria_inventario' ? 'fecha_inicio_periodo' :
+               tableName === 'historial_puntos' ? 'fecha_movimiento' :
+               tableName === 'bitacora_seguridad' ? 'fecha_evento' :
+               tableName === 'bitacora_auditoria' ? 'fecha_accion' :
+               'id_' + tableName.split('_')[0]);
+
+      if (error) {
+        logger.warn(`Error obteniendo datos de tabla ${tableName}:`, error.message);
+        continue;
+      }
+
+      if (data && data.length > 0) {
+        // Generar INSERT statements para esta tabla
+        const insertStatements = generateInsertStatements(tableName, data);
+        inserts.push(...insertStatements);
+      }
+    } catch (error) {
+      logger.warn(`Error procesando tabla ${tableName}:`, error);
+      continue;
+    }
+  }
+
+  return inserts;
+};
+
+const generateInsertStatements = (tableName: string, data: any[]): string[] => {
+  if (!data || data.length === 0) return [];
+
+  const statements: string[] = [];
+  const columns = Object.keys(data[0]).filter(col => col !== 'created_at' && col !== 'updated_at');
+
+  // Procesar en lotes de 100 registros para evitar statements demasiado largos
+  const batchSize = 100;
+  for (let i = 0; i < data.length; i += batchSize) {
+    const batch = data.slice(i, i + batchSize);
+    const values = batch.map(row => {
+      const rowValues = columns.map(col => {
+        const value = row[col];
+        if (value === null || value === undefined) return 'NULL';
+        if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+        if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+        if (value instanceof Date) return `'${value.toISOString()}'`;
+        if (typeof value === 'object') return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+        return value.toString();
+      });
+      return `(${rowValues.join(', ')})`;
+    });
+
+    const insertStatement = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${values.join(', ')};`;
+    statements.push(insertStatement);
+  }
+
+  return statements;
+};
+
 export const getSchemaSqlDump = async (_req: Request, res: Response) => {
   try {
     const content = await readSchemaFile();
     const tables = extractTableSnippets(content);
-    const inserts = extractInsertStatements(content);
-    const triggers = extractTriggerSnippets(content);
+    const staticInserts = extractInsertStatements(content);
+    const triggers = await extractTriggerSnippets();
     const functions = extractFunctionSnippets(content);
+
+    // Generar INSERT statements para todos los datos actuales
+    const dataInserts = await generateAllDataInserts();
+
+    // Combinar inserts estáticos con datos actuales
+    const allInserts = [...staticInserts, ...dataInserts];
 
     return res.json({
       success: true,
       generatedAt: new Date().toISOString(),
       tables,
-      inserts,
+      inserts: allInserts,
       triggers,
       functions,
     });
@@ -408,36 +577,180 @@ export const getSchemaSqlDump = async (_req: Request, res: Response) => {
 
 export const getIncrementalSqlDump = async (_req: Request, res: Response) => {
   try {
-    const tables: { key: IncrementalTableKey; table: string; orderBy?: string }[] = [
-      { key: 'insumo', table: 'insumo', orderBy: 'id_insumo' },
-      { key: 'venta', table: 'venta', orderBy: 'fecha_venta' },
-      { key: 'gasto_operativo', table: 'gasto_operativo', orderBy: 'fecha_gasto' },
-    ];
-
-    const queries = await Promise.all(
-      tables.map(async ({ table, orderBy }) => {
-        const query = orderBy
-          ? supabase.from(table).select('*').order(orderBy, { ascending: true })
-          : supabase.from(table).select('*');
-        const { data, error } = await query;
-        if (error) {
-          throw new Error(`Error al obtener datos de ${table}: ${error.message}`);
-        }
-        return { table, rows: data ?? [] };
-      })
-    );
-
-    const result: Record<IncrementalTableKey, { sql: string; count: number }> = {
-      insumo: { sql: '', count: 0 },
-      venta: { sql: '', count: 0 },
-      gasto_operativo: { sql: '', count: 0 },
+    const content = await readSchemaFile();
+    const allTables = extractTableSnippets(content);
+    const allIndexes = extractIndexSnippets(content);
+    const allTriggers = await extractTriggerSnippets();
+    const allFunctions = extractFunctionSnippets(content);
+    const allViews = extractViewSnippets(content);
+    const allAlters = extractAlterTableSnippets(content);
+    const modules: Record<IncrementalTableKey, { table: string; orderBy?: string }[]> = {
+      inventario: [
+        { table: 'categoria_insumo', orderBy: 'id_categoria' },
+        { table: 'proveedor', orderBy: 'id_proveedor' },
+        { table: 'insumo', orderBy: 'id_insumo' },
+        { table: 'insumo_presentacion', orderBy: 'id_presentacion' },
+        { table: 'lote_insumo', orderBy: 'id_lote' },
+        { table: 'movimiento_inventario', orderBy: 'fecha_movimiento' },
+        { table: 'bitacora_inventario', orderBy: 'fecha_accion' },
+      ],
+      ventas: [
+        { table: 'categoria_producto', orderBy: 'id_categoria' },
+        { table: 'producto', orderBy: 'id_producto' },
+        { table: 'producto_variante', orderBy: 'id_variante' },
+        { table: 'receta_detalle', orderBy: 'id_receta' },
+        { table: 'cliente', orderBy: 'id_cliente' },
+        { table: 'venta', orderBy: 'fecha_venta' },
+        { table: 'detalle_venta', orderBy: 'id_detalle' },
+        { table: 'historial_puntos', orderBy: 'fecha_movimiento' },
+        { table: 'bitacora_ventas', orderBy: 'fecha_accion' },
+        { table: 'deposito_banco', orderBy: 'fecha_deposito' },
+      ],
+      compras: [
+        { table: 'proveedor', orderBy: 'id_proveedor' },
+        { table: 'orden_compra', orderBy: 'fecha_orden' },
+        { table: 'detalle_orden_compra', orderBy: 'id_detalle' },
+        { table: 'recepcion_mercaderia', orderBy: 'fecha_recepcion' },
+        { table: 'detalle_recepcion_mercaderia', orderBy: 'id_detalle' },
+        { table: 'bitacora_ordenes_compra', orderBy: 'fecha_accion' },
+      ],
+      gastos: [
+        { table: 'categoria_gasto', orderBy: 'id_categoria' },
+        { table: 'gasto_operativo', orderBy: 'fecha_gasto' },
+      ],
+      usuarios: [
+        { table: 'rol_usuario', orderBy: 'id_rol' },
+        { table: 'perfil_usuario', orderBy: 'id_perfil' },
+        { table: 'bitacora_seguridad', orderBy: 'fecha_evento' },
+      ],
+      caja: [
+        { table: 'caja_sesion', orderBy: 'id_sesion' },
+        { table: 'arqueo_caja', orderBy: 'id_arqueo' },
+      ],
     };
 
-    queries.forEach(({ table, rows }) => {
-      const key = tables.find((item) => item.table === table)?.key;
-      if (!key) return;
-      result[key] = buildInsertGroup(table, rows as Record<string, unknown>[]);
-    });
+    const result: Record<IncrementalTableKey, { sql: string; count: number }> = {
+      inventario: { sql: '', count: 0 },
+      ventas: { sql: '', count: 0 },
+      compras: { sql: '', count: 0 },
+      gastos: { sql: '', count: 0 },
+      usuarios: { sql: '', count: 0 },
+      caja: { sql: '', count: 0 },
+    };
+
+    for (const [moduleKey, tables] of Object.entries(modules) as [IncrementalTableKey, { table: string; orderBy?: string }[]][]) {
+      const sqlParts: string[] = [];
+      let totalCount = 0;
+
+      // Add DDL for tables
+      sqlParts.push(`-- === DDL de Tablas para ${moduleKey} ===`);
+      tables.forEach(({ table }) => {
+        const tableSnippet = allTables.find(t => t.name === table);
+        if (tableSnippet) {
+          sqlParts.push(`-- Tabla: ${table}`);
+          sqlParts.push(tableSnippet.definition);
+          sqlParts.push('');
+        }
+      });
+
+      // Add indexes for these tables
+      const moduleTableNames = tables.map(t => t.table);
+      const relatedIndexes = allIndexes.filter((idx: SchemaSnippet) => {
+        const def = idx.definition.toLowerCase();
+        return moduleTableNames.some(table => def.includes(`on ${table}`) || def.includes(`on "${table}"`));
+      });
+      if (relatedIndexes.length) {
+        sqlParts.push(`-- === Indexes para ${moduleKey} ===`);
+        relatedIndexes.forEach((idx: SchemaSnippet) => {
+          sqlParts.push(`-- Index: ${idx.name}`);
+          sqlParts.push(idx.definition);
+          sqlParts.push('');
+        });
+      }
+
+      // Add triggers that affect these tables
+      const relatedTriggers = allTriggers.filter((trg: SchemaSnippet) => {
+        const def = trg.definition.toLowerCase();
+        return moduleTableNames.some(table => def.includes(`on ${table}`) || def.includes(`on "${table}"`));
+      });
+      if (relatedTriggers.length) {
+        sqlParts.push(`-- === Triggers para ${moduleKey} ===`);
+        relatedTriggers.forEach((trg: SchemaSnippet) => {
+          sqlParts.push(`-- Trigger: ${trg.name}`);
+          sqlParts.push(trg.definition);
+          sqlParts.push('');
+        });
+      }
+
+      // Add functions (all, since they are global)
+      if (allFunctions.length) {
+        sqlParts.push(`-- === Funciones ===`);
+        allFunctions.forEach((fn: SchemaSnippet) => {
+          sqlParts.push(`-- Función: ${fn.name}`);
+          sqlParts.push(fn.definition);
+          sqlParts.push('');
+        });
+      }
+
+      // Add ALTER TABLE statements for these tables
+      const relatedAlters = allAlters.filter((alt: SchemaSnippet) => {
+        const def = alt.definition.toLowerCase();
+        return moduleTableNames.some(table => def.includes(`table ${table}`) || def.includes(`table "${table}"`));
+      });
+      if (relatedAlters.length) {
+        sqlParts.push(`-- === Constraints y Alteraciones para ${moduleKey} ===`);
+        relatedAlters.forEach((alt: SchemaSnippet) => {
+          sqlParts.push(`-- Alter: ${alt.name}`);
+          sqlParts.push(alt.definition);
+          sqlParts.push('');
+        });
+      }
+
+      // Add views (all, if any)
+      if (allViews.length) {
+        sqlParts.push(`-- === Views ===`);
+        allViews.forEach((vw: SchemaSnippet) => {
+          sqlParts.push(`-- View: ${vw.name}`);
+          sqlParts.push(vw.definition);
+          sqlParts.push('');
+        });
+      }
+
+      // Add data inserts
+      const queries = await Promise.all(
+        tables.map(async ({ table, orderBy }) => {
+          try {
+            const query = orderBy
+              ? supabase.from(table).select('*').order(orderBy, { ascending: true })
+              : supabase.from(table).select('*');
+            const { data, error } = await query;
+            if (error) {
+              logger.warn(`Error al obtener datos de ${table}: ${error.message}`);
+              return { table, rows: [] };
+            }
+            return { table, rows: data ?? [] };
+          } catch (err) {
+            logger.warn(`Excepción al consultar ${table}: ${err}`);
+            return { table, rows: [] };
+          }
+        })
+      );
+
+      sqlParts.push(`-- === Inserts para ${moduleKey} ===`);
+      queries.forEach(({ table, rows }) => {
+        if (rows.length > 0) {
+          sqlParts.push(`-- Datos de ${table}`);
+          const insertGroup = buildInsertGroup(table, rows as Record<string, unknown>[]);
+          sqlParts.push(insertGroup.sql);
+          totalCount += insertGroup.count;
+        }
+      });
+
+      result[moduleKey] = {
+        sql: sqlParts.join('\n'),
+        count: totalCount,
+      };
+    }
 
     return res.json({
       success: true,

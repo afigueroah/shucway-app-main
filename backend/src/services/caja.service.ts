@@ -4,8 +4,8 @@ import { AbrirCajaDTO, CajaEstadoResponse, CajaSesion, CerrarCajaDTO, Arqueo } f
 
 type CajaSesionRow = {
   id_sesion: number;
-  id_cajero_apertura: number | null;
-  id_cajero_cierre: number | null;
+  id_cajero_apertura: string | null;
+  id_cajero_cierre: string | null;
   fecha_apertura: string;
   fecha_cierre: string | null;
   monto_inicial: number | string | null;
@@ -21,8 +21,8 @@ class CajaService {
   private toCajaSesion(data: CajaSesionRow): CajaSesion {
     return {
       id_sesion: data.id_sesion,
-      id_cajero_apertura: data.id_cajero_apertura ?? null,
-      id_cajero_cierre: data.id_cajero_cierre ?? null,
+      id_cajero_apertura: data.id_cajero_apertura ? String(data.id_cajero_apertura) : null,
+      id_cajero_cierre: data.id_cajero_cierre ? String(data.id_cajero_cierre) : null,
       fecha_apertura: data.fecha_apertura,
       fecha_cierre: data.fecha_cierre ?? null,
       monto_inicial: Number(data.monto_inicial ?? 0),
@@ -90,17 +90,91 @@ class CajaService {
     return this.toCajaSesion(data);
   }
 
-  private async crearArqueoManual(session: CajaSesion, dto: CerrarCajaDTO): Promise<void> {
-    const fechaArqueo = new Date().toISOString().split('T')[0];
-    
+  private async crearArqueoAutomatico(session: CajaSesion, fechaCierre: string): Promise<void> {
+    const fechaArqueo = new Date(fechaCierre).toISOString().split('T')[0];
+
     // Calcular totales de ventas en efectivo para esa sesión
-    const fechaDia = fechaArqueo;
+    const fechaInicio = new Date(session.fecha_apertura);
+    const fechaFin = new Date(fechaCierre);
+
     const { data: ventas, error: errorVentas } = await supabase
       .from('venta')
       .select('total_venta, tipo_pago')
       .eq('estado', 'confirmada')
-      .gte('fecha_venta', fechaDia + ' 00:00:00')
-      .lte('fecha_venta', fechaDia + ' 23:59:59');
+      .eq('id_cajero', session.id_cajero_apertura)
+      .gte('fecha_venta', fechaInicio.toISOString())
+      .lte('fecha_venta', fechaFin.toISOString());
+
+    if (errorVentas) {
+      console.error('Error obteniendo ventas para arqueo automático:', errorVentas);
+      return;
+    }
+
+    const totalEfectivo = ventas?.filter(v => v.tipo_pago === 'Cash').reduce((sum, v) => sum + Number(v.total_venta), 0) || 0;
+    const transferencias = await this.getTransferenciasPorFecha(fechaArqueo);
+
+    // Para arqueo automático, usar el total de efectivo como total contado
+    // const totalContado = totalEfectivo;
+    // const diferencia = 0; // No hay diferencia en arqueo automático
+
+    // Insertar arqueo
+    // Verificar si ya existe un arqueo para esta sesión
+    const { data: existingArqueo, error: checkError } = await supabase
+      .from('arqueo_caja')
+      .select('id_arqueo')
+      .eq('id_sesion', session.id_sesion)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error verificando arqueo existente para automático:', checkError);
+      return;
+    }
+
+    if (existingArqueo) {
+      // Ya existe, no crear otro
+      console.log('Arqueo automático ya existe para la sesión, omitiendo.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('arqueo_caja')
+      .insert({
+        fecha_arqueo: fechaArqueo,
+        id_cajero: session.id_cajero_apertura,
+        id_sesion: session.id_sesion, // Agregar referencia a la sesión
+        billetes_100: 0,
+        billetes_50: 0,
+        billetes_20: 0,
+        billetes_10: 0,
+        billetes_5: 0,
+        monedas_1: 0,
+        monedas_050: 0,
+        monedas_025: 0,
+        total_sistema: totalEfectivo,
+        transferencias: transferencias,
+        observaciones: 'Arqueo automático por cierre de caja expirada',
+        estado: 'cerrado'
+      });
+
+    if (error) {
+      throw new Error(`Error creando arqueo automático: ${error.message}`);
+    }
+  }
+
+  private async crearArqueoManual(session: CajaSesion, dto: CerrarCajaDTO): Promise<void> {
+    const fechaArqueo = new Date().toISOString().split('T')[0];
+
+    // Calcular totales de ventas en efectivo para la sesión específica
+    const fechaInicio = new Date(session.fecha_apertura);
+    const fechaFin = new Date(); // Fecha actual para cierre manual
+
+    const { data: ventas, error: errorVentas } = await supabase
+      .from('venta')
+      .select('total_venta, tipo_pago')
+      .eq('estado', 'confirmada')
+      .eq('id_cajero', session.id_cajero_apertura)
+      .gte('fecha_venta', fechaInicio.toISOString())
+      .lte('fecha_venta', fechaFin.toISOString());
 
     if (errorVentas) {
       console.error('Error obteniendo ventas para arqueo manual:', errorVentas);
@@ -111,41 +185,70 @@ class CajaService {
     const transferencias = await this.getTransferenciasPorFecha(fechaArqueo);
 
     // Si no se proporcionaron datos del arqueo, usar valores por defecto
-    const totalContado = dto.monto_cierre || totalEfectivo;
-    const diferencia = totalContado - totalEfectivo;
+    // const totalContado = dto.monto_cierre || totalEfectivo;
+    // const diferencia = totalContado - totalEfectivo;
 
-    // Insertar arqueo
-    const { error } = await supabase
+    // Verificar si ya existe un arqueo para esta sesión
+    const { data: existingArqueo, error: checkError } = await supabase
       .from('arqueo_caja')
-      .insert({
-        fecha_arqueo: fechaArqueo,
-        id_cajero: session.id_cajero_cierre || session.id_cajero_apertura,
-        billetes_100: dto.arqueo?.billetes_100 || 0,
-        billetes_50: dto.arqueo?.billetes_50 || 0,
-        billetes_20: dto.arqueo?.billetes_20 || 0,
-        billetes_10: dto.arqueo?.billetes_10 || 0,
-        billetes_5: dto.arqueo?.billetes_5 || 0,
-        monedas_1: dto.arqueo?.monedas_1 || 0,
-        monedas_050: dto.arqueo?.monedas_050 || 0,
-        monedas_025: dto.arqueo?.monedas_025 || 0,
-        total_billetes_100: (dto.arqueo?.billetes_100 || 0) * 100,
-        total_billetes_50: (dto.arqueo?.billetes_50 || 0) * 50,
-        total_billetes_20: (dto.arqueo?.billetes_20 || 0) * 20,
-        total_billetes_10: (dto.arqueo?.billetes_10 || 0) * 10,
-        total_billetes_5: (dto.arqueo?.billetes_5 || 0) * 5,
-        total_monedas_1: (dto.arqueo?.monedas_1 || 0) * 1,
-        total_monedas_050: (dto.arqueo?.monedas_050 || 0) * 0.5,
-        total_monedas_025: (dto.arqueo?.monedas_025 || 0) * 0.25,
-        total_contado: totalContado,
-        total_sistema: totalEfectivo,
-        diferencia: diferencia,
-        transferencias: transferencias,
-        observaciones: dto.observaciones || 'Arqueo automático al cerrar caja',
-        estado: 'cerrado'
-      });
+      .select('id_arqueo')
+      .eq('id_sesion', session.id_sesion)
+      .maybeSingle();
 
-    if (error) {
-      console.error('Error creando arqueo manual:', error);
+    if (checkError) {
+      console.error('Error verificando arqueo existente:', checkError);
+      throw new Error(`Error verificando arqueo: ${checkError.message}`);
+    }
+
+    if (existingArqueo) {
+      // Actualizar el arqueo existente con los datos manuales
+      const { error } = await supabase
+        .from('arqueo_caja')
+        .update({
+          id_cajero: session.id_cajero_cierre || session.id_cajero_apertura,
+          billetes_100: dto.arqueo?.billetes_100 || 0,
+          billetes_50: dto.arqueo?.billetes_50 || 0,
+          billetes_20: dto.arqueo?.billetes_20 || 0,
+          billetes_10: dto.arqueo?.billetes_10 || 0,
+          billetes_5: dto.arqueo?.billetes_5 || 0,
+          monedas_1: dto.arqueo?.monedas_1 || 0,
+          monedas_050: dto.arqueo?.monedas_050 || 0,
+          monedas_025: dto.arqueo?.monedas_025 || 0,
+          total_sistema: totalEfectivo,
+          transferencias: transferencias,
+          observaciones: dto.observaciones || 'Arqueo actualizado manualmente al cerrar caja',
+          estado: 'cerrado'
+        })
+        .eq('id_arqueo', existingArqueo.id_arqueo);
+
+      if (error) {
+        throw new Error(`Error actualizando arqueo manual: ${error.message}`);
+      }
+    } else {
+      // Insertar nuevo arqueo
+      const { error } = await supabase
+        .from('arqueo_caja')
+        .insert({
+          fecha_arqueo: fechaArqueo,
+          id_cajero: session.id_cajero_cierre || session.id_cajero_apertura,
+          id_sesion: session.id_sesion,
+          billetes_100: dto.arqueo?.billetes_100 || 0,
+          billetes_50: dto.arqueo?.billetes_50 || 0,
+          billetes_20: dto.arqueo?.billetes_20 || 0,
+          billetes_10: dto.arqueo?.billetes_10 || 0,
+          billetes_5: dto.arqueo?.billetes_5 || 0,
+          monedas_1: dto.arqueo?.monedas_1 || 0,
+          monedas_050: dto.arqueo?.monedas_050 || 0,
+          monedas_025: dto.arqueo?.monedas_025 || 0,
+          total_sistema: totalEfectivo,
+          transferencias: transferencias,
+          observaciones: dto.observaciones || 'Arqueo manual al cerrar caja',
+          estado: 'cerrado'
+        });
+
+      if (error) {
+        throw new Error(`Error creando arqueo manual: ${error.message}`);
+      }
     }
   }
 
@@ -167,7 +270,7 @@ class CajaService {
     return this.ensureActiveSession();
   }
 
-  async abrirCaja(idCajero: number, dto: AbrirCajaDTO): Promise<CajaSesion> {
+  async abrirCaja(idCajero: string, dto: AbrirCajaDTO): Promise<CajaSesion> {
     const estado = await this.ensureActiveSession();
     if (estado.abierta) {
       throw new AppError('Ya existe una caja abierta actualmente.', 409);
@@ -193,7 +296,7 @@ class CajaService {
     return this.toCajaSesion(data);
   }
 
-  async cerrarCaja(idCajero: number, dto: CerrarCajaDTO): Promise<CajaSesion> {
+  async cerrarCaja(idCajero: string, dto: CerrarCajaDTO): Promise<CajaSesion> {
     const estado = await this.ensureActiveSession();
     if (!estado.abierta || !estado.sesion) {
       throw new AppError('No hay una caja abierta para cerrar.', 400);
@@ -226,7 +329,7 @@ class CajaService {
     return sesionCerrada;
   }
 
-  async requireCajaAbierta(idCajero: number): Promise<CajaSesion> {
+  async requireCajaAbierta(idCajero: string): Promise<CajaSesion> {
     const estado = await this.ensureActiveSession();
     if (!estado.abierta || !estado.sesion) {
       throw new AppError('Debes abrir la caja antes de registrar ventas.', 403);
@@ -245,7 +348,13 @@ class CajaService {
       .from('arqueo_caja')
       .select(`
         *,
-        caja_sesion!left(fecha_apertura, fecha_cierre)
+        caja_sesion!left (
+          fecha_apertura,
+          fecha_cierre,
+          monto_inicial,
+          monto_cierre,
+          observaciones
+        )
       `)
       .order('fecha_arqueo', { ascending: false });
 
@@ -262,7 +371,11 @@ class CajaService {
       throw new AppError(`Error al obtener arqueos: ${error.message}`, 500);
     }
 
-    // Para cada arqueo, si transferencias está vacío, poblarlo
+    if (!data) {
+      return [];
+    }
+
+    // Para cada arqueo, poblar transferencias si está vacío
     const arqueos = await Promise.all(data.map(async (row) => {
       let transferencias = row.transferencias || [];
       if (transferencias.length === 0) {
@@ -270,37 +383,10 @@ class CajaService {
         // Opcional: actualizar la BD, pero por ahora solo en memoria
       }
       
-      // Si no hay información de sesión, intentar buscarla por fecha y cajero
-      let fecha_apertura = row.caja_sesion?.fecha_apertura;
-      let fecha_cierre = row.caja_sesion?.fecha_cierre;
-      
-      if (!fecha_apertura && row.id_cajero) {
-        // Buscar sesión por cajero y fecha aproximada
-        const fechaArqueo = new Date(row.fecha_arqueo);
-        const fechaInicio = new Date(fechaArqueo);
-        fechaInicio.setHours(0, 0, 0, 0);
-        const fechaFin = new Date(fechaArqueo);
-        fechaFin.setHours(23, 59, 59, 999);
-        
-        const { data: sesiones } = await supabase
-          .from('caja_sesion')
-          .select('fecha_apertura, fecha_cierre')
-          .eq('id_cajero_apertura', row.id_cajero)
-          .gte('fecha_apertura', fechaInicio.toISOString())
-          .lte('fecha_apertura', fechaFin.toISOString())
-          .order('fecha_apertura', { ascending: false })
-          .limit(1);
-          
-        if (sesiones && sesiones.length > 0) {
-          fecha_apertura = sesiones[0].fecha_apertura;
-          fecha_cierre = sesiones[0].fecha_cierre;
-        }
-      }
-      
       return {
         id_arqueo: row.id_arqueo,
         fecha_arqueo: row.fecha_arqueo,
-        id_cajero: row.id_cajero,
+        id_cajero: row.id_cajero ? String(row.id_cajero) : null,
         billetes_100: row.billetes_100,
         billetes_50: row.billetes_50,
         billetes_20: row.billetes_20,
@@ -323,8 +409,8 @@ class CajaService {
         transferencias,
         observaciones: row.observaciones,
         estado: row.estado,
-        fecha_apertura,
-        fecha_cierre,
+        fecha_apertura: row.caja_sesion?.fecha_apertura,
+        fecha_cierre: row.caja_sesion?.fecha_cierre,
       };
     }));
 
