@@ -24,6 +24,7 @@
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "@types/multer": "^2.0.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -32,6 +33,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "pg": "^8.16.3",
     "serverless-http": "^4.0.0",
     "winston": "^3.17.0",

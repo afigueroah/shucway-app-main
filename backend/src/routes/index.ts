@@ -16,6 +16,7 @@ import reportesRoutes from './reportes.routes';
 import gastosOperativosRoutes from './gastos_operativos.routes';
 import cajaRoutes from './caja.routes';
 import resetRoutes from './reset.routes';
+import maintenanceRoutes from './maintenance.routes';
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.use('/reportes', reportesRoutes);
 router.use('/gastos-operativos', gastosOperativosRoutes);
 router.use('/caja', cajaRoutes);
 router.use('/reset', resetRoutes);
+router.use('/maintenance', maintenanceRoutes);
 
 // Rutas adicionales para compatibilidad con frontend
 router.get('/db/tables-count', dashboardController.getTablesCount);

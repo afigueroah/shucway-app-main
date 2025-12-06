@@ -74,7 +74,7 @@ const ReinicioDatos: React.FC = () => {
         addNotification({
           type: 'success',
           title: 'Limpieza total completada',
-          message: 'Todos los módulos han sido reiniciados exitosamente (excepto rol_usuario, perfil_usuario y bitacora_seguridad). Se eliminaron depósitos bancarios, bitácoras de insumo y sesiones de caja.',
+          message: 'Todos los módulos han sido reiniciados exitosamente (excepto rol_usuario, perfil_usuario y bitacora_seguridad). Se eliminaron depósitos bancarios, bitácoras de insumo y sesiones de caja. Los IDs de todas las tablas han sido reiniciados.',
           duration: 5000
         });
       } else {
@@ -188,6 +188,8 @@ const ReinicioDatos: React.FC = () => {
                       <h3 className="font-semibold text-red-800">Advertencia</h3>
                       <p className="text-sm text-red-700 mt-1">
                         Esta opción reiniciará todos los módulos excepto los perfiles de usuario, roles y bitácora de seguridad.
+                        <br />
+                        <strong>Los IDs de todas las tablas serán reiniciados a 1.</strong>
                       </p>
                     </div>
                   </div>
@@ -213,7 +215,7 @@ const ReinicioDatos: React.FC = () => {
                   onClick={() =>
                     showConfirm(
                       'Limpieza Total',
-                      '¿Estás seguro de que quieres realizar una limpieza total? Todos los datos serán eliminados permanentemente, excepto los perfiles de usuario, roles y bitácora de seguridad.',
+                      '¿Estás seguro de que quieres realizar una limpieza total? Todos los datos serán eliminados permanentemente, excepto los perfiles de usuario, roles y bitácora de seguridad. Los IDs de todas las tablas serán reiniciados a 1.',
                       resetAll
                     )
                   }

@@ -7,6 +7,12 @@ import {
   ReloadOutlined,
   RollbackOutlined,
   RightOutlined,
+  DatabaseOutlined,
+  InfoCircleOutlined,
+  FileTextOutlined,
+  ExclamationCircleOutlined,
+  CheckCircleOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { localStore } from '../../../../utils/storage';
@@ -109,43 +115,27 @@ const createId = () =>
 
 const sanitizeFilenameFragment = (value: string) => value.replace(/[:.]/g, '-');
 
+const formatBytes = (bytes?: number) => {
+  if (!bytes || Number.isNaN(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index++;
+  }
+  return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
+};
+
 const composeSchemaSql = (payload: SchemaSqlPayload): string => {
   const sections: string[] = [];
 
-  sections.push('-- SHUCWAY ERP - Backup Completo con Datos');
+  sections.push('-- SHUCWAY ERP - Backup de Datos');
   sections.push(`-- Generado: ${payload.generatedAt}`);
-  sections.push('-- Este archivo incluye la estructura completa de la base de datos y TODOS los datos actuales');
+  sections.push('-- Este archivo incluye TODOS los datos actuales de la base de datos');
   sections.push('');
 
-  if (payload.tables.length) {
-    sections.push('-- === Tablas ===');
-    payload.tables.forEach(({ name, definition }) => {
-      sections.push(`-- Tabla: ${name}`);
-      sections.push(definition.trim());
-      sections.push('');
-    });
-  }
-
-  if (payload.triggers.length) {
-    sections.push('-- === Triggers ===');
-    payload.triggers.forEach(({ name, definition }) => {
-      sections.push(`-- Trigger: ${name}`);
-      sections.push(definition.trim());
-      sections.push('');
-    });
-  }
-
-  if (payload.functions.length) {
-    sections.push('-- === Funciones ===');
-    payload.functions.forEach(({ name, definition }) => {
-      sections.push(`-- Función: ${name}`);
-      sections.push(definition.trim());
-      sections.push('');
-    });
-  }
-
   if (payload.inserts.length) {
-    sections.push('-- === Inserts ===');
     payload.inserts.forEach((statement) => {
       sections.push(statement.trim());
     });
@@ -217,10 +207,14 @@ const Backup: React.FC = () => {
   const [incrementalLoading, setIncrementalLoading] = useState(false);
   const [incrementalError, setIncrementalError] = useState<string | null>(null);
 
-  const [selectedTable, setSelectedTable] = useState<IncrementalTableKey>('insumo');
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
   const [history, setHistory] = useState<BackupHistoryItem[]>(() => loadStoredHistory());
   const [historyPage, setHistoryPage] = useState(1);
-  const [historyPageSize, setHistoryPageSize] = useState<number>(PAGE_SIZE_OPTIONS[1]); // 10 por defecto
+  const [historyPageSize, setHistoryPageSize] = useState(10);
+  const [selectedTable, setSelectedTable] = useState<IncrementalTableKey>('inventario');
 
   const persistHistory = useCallback((records: BackupHistoryItem[]) => {
     localStore.set('backups', records, { expires: 60 * 24 * 30 }); // 30 días
@@ -340,13 +334,13 @@ const Backup: React.FC = () => {
     registerHistory({
       id: createId(),
       type: 'schema',
-      label: 'Backup Completo',
+      label: 'Backup de Datos',
       createdAt: new Date().toISOString(),
       filename,
       sizeBytes,
       sourceGeneratedAt: schemaData.generatedAt,
     });
-    messageApi.success('Backup completo exportado exitosamente con toda la estructura y datos.');
+    messageApi.success('Backup de datos exportado exitosamente con todos los datos actuales.');
   }, [schemaData, downloadTextFile, registerHistory, messageApi]);
 
   const downloadIncremental = useCallback(
@@ -425,26 +419,188 @@ const Backup: React.FC = () => {
 
   const handleClearHistory = useCallback(() => {
     if (!history.length) {
-      messageApi.info('No existen registros para limpiar.');
+      messageApi.info('No hay registros para limpiar.');
       return;
     }
 
     Modal.confirm({
       title: '¿Limpiar historial local?',
-      content: 'Se eliminarán todos los registros almacenados en este navegador.',
+      content: 'Esto eliminará todos los registros de backups guardados en este navegador.',
       okText: 'Limpiar',
       okType: 'danger',
       cancelText: 'Cancelar',
       onOk: () => {
-        setHistory(() => {
-          persistHistory([]);
-          return [];
-        });
-        setHistoryPage(1);
-        messageApi.success('Historial limpiado correctamente.');
+        setHistory([]);
+        persistHistory([]);
+        messageApi.success('Historial local eliminado.');
       },
     });
-  }, [history, messageApi, persistHistory]);
+  }, [history.length, messageApi, persistHistory]);
+
+  const handleRestoreBackup = useCallback(async () => {
+    if (!selectedFile) {
+      messageApi.error('Por favor selecciona un archivo SQL para restaurar.');
+      return;
+    }
+
+    Modal.confirm({
+      title: (
+        <div className="flex items-center gap-2">
+          <DatabaseOutlined className="text-blue-500" />
+          <span className="text-lg font-semibold">Restaurar Backup</span>
+        </div>
+      ),
+      content: (
+        <div className="space-y-4 py-2">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <InfoCircleOutlined className="text-blue-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">¿Estás seguro de restaurar este backup?</h4>
+                <p className="text-sm text-blue-700">
+                  Esta acción importará los datos del archivo seleccionado a la base de datos.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <h5 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+              <FileTextOutlined />
+              Información del archivo
+            </h5>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Nombre:</span>
+                <span className="font-medium text-gray-900 truncate max-w-48" title={selectedFile.name}>
+                  {selectedFile.name}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Tamaño:</span>
+                <span className="font-medium text-gray-900">{formatBytes(selectedFile.size)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Tipo:</span>
+                <span className="font-medium text-gray-900">SQL Database</span>
+              </div>
+            </div>
+          </div>
+
+          <Alert
+            message={
+              <div className="flex items-center gap-2">
+                <ExclamationCircleOutlined />
+                <span className="font-medium">Advertencia importante</span>
+              </div>
+            }
+            description={
+              <div className="space-y-1">
+                <p>• Esta acción puede sobrescribir datos existentes</p>
+                <p>• Asegúrate de tener un backup actual antes de continuar</p>
+                <p>• Los datos existentes podrían perderse permanentemente</p>
+              </div>
+            }
+            type="warning"
+            showIcon={false}
+            className="border-orange-200 bg-orange-50"
+          />
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-green-800">
+              <CheckCircleOutlined />
+              <span className="font-medium">¿Todo listo?</span>
+            </div>
+            <p className="text-sm text-green-700 mt-1">
+              Una vez confirmado, el sistema procesará todos los INSERT statements del archivo.
+            </p>
+          </div>
+        </div>
+      ),
+      okText: (
+        <div className="flex items-center gap-2">
+          <UploadOutlined />
+          <span>Restaurar Backup</span>
+        </div>
+      ),
+      okType: 'primary',
+      okButtonProps: {
+        className: 'bg-blue-600 hover:bg-blue-700 border-blue-600',
+        size: 'large',
+      },
+      cancelText: 'Cancelar',
+      cancelButtonProps: {
+        size: 'large',
+      },
+      width: 600,
+      centered: true,
+      onOk: async () => {
+        setRestoreLoading(true);
+        setRestoreError(null);
+
+        try {
+          const formData = new FormData();
+          formData.append('backupFile', selectedFile);
+
+          const response = await fetch(`${apiBaseUrl}/backup/restore`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStore.get('access_token')}`,
+            },
+            body: formData,
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            messageApi.success(
+              `Backup restaurado exitosamente. ${result.results.success} inserts procesados correctamente.`
+            );
+            setSelectedFile(null);
+
+            // Mostrar detalles si hay errores
+            if (result.results.errors > 0) {
+              Modal.info({
+                title: 'Detalles de la restauración',
+                content: (
+                  <div className="max-h-96 overflow-y-auto">
+                    <p className="mb-4">
+                      <strong>Total:</strong> {result.results.total} statements<br />
+                      <strong>Éxitos:</strong> {result.results.success}<br />
+                      <strong>Errores:</strong> {result.results.errors}
+                    </p>
+                    {result.results.details.filter((d: any) => !d.success).length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Errores encontrados:</h4>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {result.results.details
+                            .filter((d: any) => !d.success)
+                            .map((detail: any, index: number) => (
+                              <div key={index} className="text-sm bg-red-50 p-2 rounded border">
+                                <strong>Statement {detail.index}:</strong> {detail.error}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ),
+                width: 600,
+              });
+            }
+          } else {
+            throw new Error(result.details || result.error || 'Error al restaurar el backup');
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Error desconocido al restaurar backup';
+          setRestoreError(errorMessage);
+          messageApi.error(errorMessage);
+        } finally {
+          setRestoreLoading(false);
+        }
+      },
+    });
+  }, [selectedFile, apiBaseUrl, messageApi]);
 
   const incrementalTotals = useMemo(() => {
     if (!incrementalData) return null;
@@ -537,7 +693,7 @@ const Backup: React.FC = () => {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-xl space-y-2">
                   <Text strong className="text-emerald-700">
-                    Backup Completo
+                    Backup de Datos
                   </Text>
                   <Paragraph className="!mb-0 text-sm text-emerald-900/75">
                     Exporta la definición completa de tu base de datos incluyendo tablas, triggers, funciones y TODOS los datos actuales. Ideal para migraciones completas o restauraciones totales con información actual.
@@ -553,7 +709,7 @@ const Backup: React.FC = () => {
                 >
                   <div className="flex items-center gap-2">
                     <DownloadOutlined className="text-lg" />
-                    <span className="font-semibold">Backup Completo</span>
+                    <span className="font-semibold">Backup de Datos</span>
                   </div>
                 </Button>
               </div>
@@ -744,6 +900,62 @@ const Backup: React.FC = () => {
                   </div>
                 )}
                 {incrementalError ? <Alert type="error" message={incrementalError} showIcon /> : null}
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-red-100 bg-white p-8 shadow-xl">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Text strong className="text-red-700">
+                    Restaurar Backup
+                  </Text>
+                  <Paragraph className="!mb-0 text-sm text-red-900/75">
+                    Sube un archivo SQL de backup para restaurar los datos. Solo se procesarán los statements INSERT.
+                  </Paragraph>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <input
+                      type="file"
+                      accept=".sql"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setSelectedFile(file);
+                        setRestoreError(null);
+                      }}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+                    />
+                    {selectedFile && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        Archivo seleccionado: <strong>{selectedFile.name}</strong> ({formatBytes(selectedFile.size)})
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Tooltip title="Restaurar backup desde archivo SQL">
+                      <Button
+                        type="primary"
+                        shape="circle"
+                        icon={<RollbackOutlined />}
+                        className="border-0 bg-red-600 hover:bg-red-700"
+                        onClick={handleRestoreBackup}
+                        loading={restoreLoading}
+                        disabled={restoreLoading || !selectedFile}
+                      />
+                    </Tooltip>
+                  </div>
+                </div>
+
+                {restoreError ? <Alert type="error" message={restoreError} showIcon /> : null}
+
+                <Alert
+                  message="Importante"
+                  description="Asegúrate de que el archivo SQL contenga solo statements INSERT válidos. La restauración puede tomar tiempo dependiendo del tamaño del archivo."
+                  type="info"
+                  showIcon
+                />
               </div>
             </section>
           </div>

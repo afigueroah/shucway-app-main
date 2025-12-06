@@ -6,11 +6,11 @@ export const resetService = {
       console.log('Iniciando reset de ventas...');
 
       // Eliminar detalles de venta primero (dependen de venta)
-      const { error: error1 } = await supabase.from('detalle_venta').delete();
+      const { error: error1 } = await supabase.from('detalle_venta').delete().gte('id_detalle', 0);
       if (error1) console.error('Error eliminando detalles de venta:', error1);
 
       // Luego eliminar ventas
-      const { error: error2 } = await supabase.from('venta').delete();
+      const { error: error2 } = await supabase.from('venta').delete().gte('id_venta', 0);
       if (error2) console.error('Error eliminando ventas:', error2);
 
       console.log('Reset de ventas completado');
@@ -392,10 +392,9 @@ export const resetService = {
       const { error: error7 } = await supabase.from('bitacora_productos').delete().gte('id_bitacora_producto', 0);
       if (error7) console.error('Error eliminando bitácora de productos:', error7);
 
-      // Eliminar bitácora de insumo
-      console.log('Eliminando bitacora_insumo...');
-      const { error: error9 } = await supabase.from('bitacora_insumo').delete().gte('id_bitacora_insumo', 0);
-      if (error9) console.error('Error eliminando bitácora de insumo:', error9);
+      // Eliminar bitácora de insumo (esta tabla no existe en el esquema actual)
+      // Nota: La bitácora de inventario se maneja en bitacora_inventario
+      console.log('Bitácora de insumo no existe en el esquema actual - omitiendo...');
 
       // Eliminar depósitos bancarios y sesiones de caja
       console.log('Eliminando deposito_banco...');
@@ -407,10 +406,116 @@ export const resetService = {
       if (error11) console.error('Error eliminando sesiones de caja:', error11);
       // NOTA: bitacora_seguridad NO se elimina en limpieza total
 
+      // Resetear todas las secuencias de IDs después de la limpieza
+      console.log('Reseteando secuencias de IDs...');
+      await this.resetAllSequences();
+
       console.log('Limpieza total completada (preservando rol_usuario, perfil_usuario y bitacora_seguridad)');
     } catch (error) {
       console.error('Error general en resetAll:', error);
       throw error;
+    }
+  },
+
+  // Método manual como fallback (definido antes para evitar errores de hoisting)
+  async resetSequencesManually() {
+    console.log('Ejecutando reset manual de secuencias...');
+
+    const sequences = [
+      'categoria_insumo_id_categoria_seq',
+      'proveedor_id_proveedor_seq',
+      'insumo_id_insumo_seq',
+      'insumo_presentacion_id_presentacion_seq',
+      'lote_insumo_id_lote_seq',
+      'movimiento_inventario_id_movimiento_seq',
+      'bitacora_inventario_id_bitacora_inventario_seq',
+      'categoria_producto_id_categoria_seq',
+      'producto_id_producto_seq',
+      'producto_variante_id_variante_seq',
+      'receta_detalle_id_receta_seq',
+      'cliente_id_cliente_seq',
+      'categoria_gasto_id_categoria_seq',
+      'gasto_operativo_id_gasto_seq',
+      'arqueo_caja_id_arqueo_seq',
+      'deposito_banco_id_deposito_seq',
+      'venta_id_venta_seq',
+      'detalle_venta_id_detalle_seq',
+      'orden_compra_id_orden_seq',
+      'detalle_orden_compra_id_detalle_seq',
+      'recepcion_mercaderia_id_recepcion_seq',
+      'detalle_recepcion_mercaderia_id_detalle_seq',
+      'historial_puntos_id_historial_seq',
+      'caja_sesion_id_sesion_seq',
+      'auditoria_inventario_id_auditoria_seq',
+      'auditoria_detalle_id_detalle_seq',
+      'bitacora_auditoria_id_bitacora_seq',
+      'bitacora_ventas_id_bitacora_venta_seq',
+      'bitacora_ordenes_compra_id_bitacora_orden_seq',
+      'bitacora_productos_id_bitacora_producto_seq'
+    ];
+
+    let errorCount = 0;
+
+    for (const sequence of sequences) {
+      try {
+        // Intentar usar setval si exec_sql está disponible
+        const { error } = await supabase.rpc('exec_sql', {
+          query: `SELECT setval('${sequence}', 1, false)`
+        });
+
+        if (error) {
+          console.warn(`No se pudo resetear automáticamente ${sequence}`);
+          errorCount++;
+        } else {
+          console.log(`Secuencia ${sequence} reseteada manualmente`);
+        }
+      } catch (seqError) {
+        console.warn(`Error al resetear ${sequence}:`, seqError);
+        errorCount++;
+      }
+    }
+
+    if (errorCount > 0) {
+      console.warn(`${errorCount} secuencias requieren reset manual en Supabase`);
+      console.warn('Ejecuta el script reset_sequences_manual.sql en SQL Editor');
+    } else {
+      console.log('Reset manual completado exitosamente');
+    }
+  },
+
+  async resetAllSequences() {
+    try {
+      console.log('Iniciando reset automático de todas las secuencias de IDs...');
+
+      // Usar la función RPC específica para reset de secuencias
+      const { data, error } = await supabase.rpc('reset_all_sequences');
+
+      if (error) {
+        console.warn('Error al ejecutar reset automático de secuencias:', error.message);
+        console.warn('Cambiando a método manual...');
+
+        // Fallback: método manual si la función RPC falla
+        await this.resetSequencesManually();
+        return;
+      }
+
+      if (data && data.success) {
+        console.log('✅ Reset automático de secuencias completado exitosamente');
+        console.log('Mensaje:', data.message);
+      } else {
+        console.warn('⚠️ Reset automático completado con advertencias:', data?.message);
+      }
+
+    } catch (error) {
+      console.error('Error general en resetAllSequences:', error);
+      console.warn('Intentando método manual como fallback...');
+
+      // Fallback final: método manual
+      try {
+        await this.resetSequencesManually();
+      } catch (manualError) {
+        console.error('Error incluso en método manual:', manualError);
+      }
     }
   }
 };

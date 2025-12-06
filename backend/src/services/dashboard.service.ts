@@ -184,41 +184,32 @@ export const dashboardService = {
 
   async getTableColumns(tableName: string): Promise<{ column_name: string; data_type: string; is_nullable: string; ordinal_position: number }[]> {
     try {
-      // Intentar consultar las columnas usando information_schema
-      const { data, error } = await supabase
-        .from('information_schema.columns')
-        .select('column_name, data_type, is_nullable, ordinal_position')
-        .eq('table_schema', 'public')
-        .eq('table_name', tableName)
-        .order('ordinal_position');
+      // En Supabase no podemos acceder a information_schema.columns
+      // Usamos una consulta con LIMIT 1 para inferir las columnas desde los datos
+      const { data: sampleData, error: sampleError } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(1);
 
-      if (error) {
-        console.warn('No se pudieron obtener columnas desde information_schema:', error.message);
-        // Fallback: intentar obtener columnas consultando la tabla con limit 0
-        try {
-          const { data: sampleData, error: sampleError } = await supabase
-            .from(tableName)
-            .select('*')
-            .limit(1);
-
-          if (!sampleError && sampleData && sampleData.length > 0) {
-            const columns = Object.keys(sampleData[0]).map((key, index) => ({
-              column_name: key,
-              data_type: 'text', // No podemos determinar el tipo exacto
-              is_nullable: 'YES',
-              ordinal_position: index + 1
-            }));
-            return columns;
-          }
-        } catch (fallbackError) {
-          console.warn('Fallback también falló:', fallbackError);
-        }
+      if (sampleError) {
+        console.warn('No se pudieron obtener columnas consultando la tabla:', sampleError.message);
         return [];
       }
 
-      return data || [];
+      if (sampleData && sampleData.length > 0) {
+        // Inferir columnas desde el primer registro
+        const columns = Object.keys(sampleData[0]).map((key, index) => ({
+          column_name: key,
+          data_type: 'text', // No podemos determinar el tipo exacto sin information_schema
+          is_nullable: 'YES', // Asumimos nullable por defecto
+          ordinal_position: index + 1
+        }));
+        return columns;
+      }
+
+      return [];
     } catch (error) {
-      console.error('Error al obtener columnas de la tabla:', error);
+      console.error('Error obteniendo columnas de tabla:', error);
       return [];
     }
   },

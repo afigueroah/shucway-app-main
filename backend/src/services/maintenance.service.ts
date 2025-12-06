@@ -222,7 +222,7 @@ export const maintenanceService = {
 	},
 
 	async executeSql(sql: string) {
-		const { error } = await supabase.rpc('execute_sql', { sql_query: sql });
+		const { error } = await supabase.rpc('exec_sql', { sql });
 
 		if (error) {
 			throw new Error(error.message);
