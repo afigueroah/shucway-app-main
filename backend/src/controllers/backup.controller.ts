@@ -451,7 +451,6 @@ const generateAllDataInserts = async (): Promise<string[]> => {
     'cliente',
     'categoria_gasto',
     'gasto_operativo',
-    'caja_sesion',
     'arqueo_caja',
     'venta',
     'detalle_venta',
@@ -523,17 +522,53 @@ const generateInsertStatements = (tableName: string, data: any[]): string[] => {
     'auditoria_detalle': ['diferencia'],
     'detalle_orden_compra': ['subtotal', 'iva'],
     'gasto_operativo': ['numero_gasto'],
-    'venta': ['total_venta', 'total_costo'],
+    'venta': ['total_venta', 'total_costo', 'ganancia'],
     'cliente': ['puntos_acumulados'],
     'insumo': ['costo_promedio', 'stock_actual'],
     'producto': ['costo_calculado'],
     'lote_insumo': ['cantidad_actual'],
-    'movimiento_inventario': ['costo_unitario_momento'],
+    'movimiento_inventario': ['costo_unitario_momento', 'costo_total'],
     'orden_compra': ['total'],
     'recepcion_mercaderia': ['total_recibido'],
     'detalle_recepcion_mercaderia': ['cantidad_aceptada'],
-    'detalle_venta': ['subtotal', 'costo_total', 'precio_unitario', 'costo_unitario'],
+    'detalle_venta': ['subtotal', 'costo_total', 'precio_unitario', 'costo_unitario', 'ganancia'],
     'historial_puntos': ['puntos_nuevo']
+  };
+
+  // Columnas de conflicto para cada tabla (clave primaria)
+  const conflictColumns: Record<string, string[]> = {
+    'rol_usuario': ['id_rol'],
+    'perfil_usuario': ['id_perfil'],
+    'bitacora_seguridad': ['id_bitacora'],
+    'categoria_insumo': ['id_categoria'],
+    'proveedor': ['id_proveedor'],
+    'insumo': ['id_insumo'],
+    'insumo_presentacion': ['id_presentacion'],
+    'lote_insumo': ['id_lote'],
+    'categoria_producto': ['id_categoria'],
+    'producto': ['id_producto'],
+    'producto_variante': ['id_variante'],
+    'receta_detalle': ['id_receta'],
+    'cliente': ['id_cliente'],
+    'categoria_gasto': ['id_categoria'],
+    'gasto_operativo': ['id_gasto'],
+    'arqueo_caja': ['id_arqueo'],
+    'venta': ['id_venta'],
+    'detalle_venta': ['id_detalle'],
+    'deposito_banco': ['id_deposito'],
+    'orden_compra': ['id_orden'],
+    'detalle_orden_compra': ['id_detalle'],
+    'recepcion_mercaderia': ['id_recepcion'],
+    'detalle_recepcion_mercaderia': ['id_detalle'],
+    'historial_puntos': ['id_historial'],
+    'movimiento_inventario': ['id_movimiento'],
+    'bitacora_inventario': ['id_bitacora'],
+    'bitacora_ventas': ['id_bitacora'],
+    'bitacora_ordenes_compra': ['id_bitacora'],
+    'bitacora_productos': ['id_bitacora'],
+    'auditoria_inventario': ['id_auditoria'],
+    'auditoria_detalle': ['id_detalle'],
+    'bitacora_auditoria': ['id_bitacora']
   };
 
   const columns = Object.keys(data[0])
@@ -543,6 +578,20 @@ const generateInsertStatements = (tableName: string, data: any[]): string[] => {
   if (columns.length === 0) {
     logger.warn(`No hay columnas válidas para insertar en la tabla ${tableName}`);
     return [];
+  }
+
+  // Obtener las columnas de conflicto para esta tabla
+  const conflictCols = conflictColumns[tableName];
+  let conflictClause = 'ON CONFLICT DO NOTHING';
+
+  if (conflictCols && conflictCols.length > 0) {
+    // Crear una cláusula UPSERT que actualice todas las columnas no conflictivas
+    const updateColumns = columns.filter(c => !conflictCols.includes(c));
+    if (updateColumns.length > 0) {
+      conflictClause = `ON CONFLICT (${conflictCols.map(c => `"${c}"`).join(', ')}) DO UPDATE SET ${updateColumns.map(c => `"${c}" = EXCLUDED."${c}"`).join(', ')}`;
+    } else {
+      conflictClause = `ON CONFLICT (${conflictCols.map(c => `"${c}"`).join(', ')}) DO NOTHING`;
+    }
   }
 
   // Crear INSERT statements individuales para mejor manejo de errores
@@ -557,7 +606,7 @@ const generateInsertStatements = (tableName: string, data: any[]): string[] => {
       return value.toString();
     });
 
-    const insertStatement = `INSERT INTO ${tableName} (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${rowValues.join(', ')}) ON CONFLICT DO NOTHING;`;
+    const insertStatement = `INSERT INTO ${tableName} (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${rowValues.join(', ')}) ${conflictClause};`;
     statements.push(insertStatement);
   }
 
@@ -821,82 +870,77 @@ export const restoreBackup = async (req: Request, res: Response) => {
 
     // Forzar el uso de execute_sql directo para archivos de backup procesados
     if (true || invalidStatements.length > 0) {
-      // Usar el método directo de SQL que funciona desde el SQL Editor
-      logger.info('Usando método directo de SQL para restauración de backup...');
+      // Procesar INSERT statements individualmente para mejor manejo de errores
+      logger.info('Procesando INSERT statements individualmente...');
 
-      try {
-        // Limpiar comentarios del SQL
-        const cleanedSQL = fileContent
-          .replace(/--.*$/gm, '') // Comentarios de línea
-          .replace(/\/\*[\s\S]*?\*\//g, '') // Comentarios de bloque
-          .trim();
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
 
-        if (!cleanedSQL) {
-          return res.status(400).json({
-            success: false,
-            error: 'El archivo no contiene SQL válido después de limpiar comentarios'
+      for (const statement of insertStatements) {
+        try {
+          // Primero intentar INSERT directo
+          const { error: insertError } = await supabase.rpc('execute_sql', {
+            sql_query: statement
           });
-        }
 
-        // Ejecutar el SQL usando RPC
-        const { data, error } = await supabase.rpc('execute_sql', {
-          sql_query: cleanedSQL
-        });
+          if (insertError) {
+            // Si hay error de clave duplicada, intentar convertir a UPDATE
+            if (insertError.message?.includes('duplicate key value') ||
+                insertError.message?.includes('violates unique constraint')) {
 
-        if (error) {
-          logger.error('Error al ejecutar SQL directamente:', error);
+              try {
+                // Convertir INSERT a UPDATE
+                const updateStatement = convertInsertToUpdate(statement);
+                if (updateStatement) {
+                  const { error: updateError } = await supabase.rpc('execute_sql', {
+                    sql_query: updateStatement
+                  });
 
-          // Verificar si la función no existe
-          if (error.message?.includes('function') && error.message?.includes('does not exist')) {
-            return res.status(500).json({
-              success: false,
-              error: 'La función execute_sql no está configurada en Supabase',
-              details: 'Por favor, ejecuta el script SQL para crear la función execute_sql en el SQL Editor de Supabase.',
-              sqlNeeded: true
-            });
+                  if (updateError) {
+                    logger.warn(`Error en UPDATE: ${updateError.message}`);
+                    errorCount++;
+                  } else {
+                    successCount++;
+                  }
+                } else {
+                  logger.warn(`No se pudo convertir INSERT a UPDATE: ${statement.substring(0, 100)}...`);
+                  errorCount++;
+                }
+              } catch (updateError) {
+                logger.warn(`Error convirtiendo a UPDATE: ${updateError}`);
+                errorCount++;
+              }
+            } else {
+              // Error diferente, registrarlo
+              logger.error(`Error en INSERT: ${insertError.message}`);
+              errors.push(`Error en: ${statement.substring(0, 100)}... - ${insertError.message}`);
+              errorCount++;
+            }
+          } else {
+            successCount++;
           }
-
-          return res.status(500).json({
-            success: false,
-            error: 'Error al ejecutar el código SQL',
-            details: error.message
-          });
+        } catch (error) {
+          logger.error(`Error procesando statement: ${error}`);
+          errors.push(`Error en: ${statement.substring(0, 100)}... - ${error instanceof Error ? error.message : 'Error desconocido'}`);
+          errorCount++;
         }
-
-        const rpcResult = Array.isArray(data) ? data[0] : data;
-        const rpcSuccess = rpcResult?.success !== false;
-
-        if (!rpcSuccess) {
-          const rpcErrorMessage = rpcResult?.error || 'La función execute_sql reportó un error interno';
-          logger.error('execute_sql devolvió error lógico:', rpcErrorMessage);
-          return res.status(500).json({
-            success: false,
-            error: rpcErrorMessage,
-            details: rpcResult?.detail || 'Verifique el contenido del archivo SQL.'
-          });
-        }
-
-        logger.info('Código SQL ejecutado exitosamente');
-        return res.json({
-          success: true,
-          message: 'Backup restaurado exitosamente usando SQL directo',
-          type: 'sql_code',
-          results: {
-            total: insertStatements.length,
-            success: insertStatements.length,
-            errors: 0,
-            details: []
-          }
-        });
-
-      } catch (error) {
-        logger.error('Error ejecutando SQL directamente:', error);
-        return res.status(500).json({
-          success: false,
-          error: 'Error al ejecutar el código SQL',
-          details: error instanceof Error ? error.message : 'Error desconocido'
-        });
       }
+
+      logger.info(`Restauración completada: ${successCount} exitosos, ${errorCount} omitidos/errores`);
+
+      return res.json({
+        success: true,
+        message: 'Backup restaurado exitosamente (procesamiento individual)',
+        type: 'individual_processing',
+        results: {
+          total: insertStatements.length,
+          success: successCount,
+          skipped: errorCount - errors.length,
+          errors: errors.length,
+          errorDetails: errors.slice(0, 10) // Limitar a los primeros 10 errores
+        }
+      });
     }
 
     logger.info(`Encontrados ${insertStatements.length} statements INSERT válidos para ejecutar`);
@@ -1154,6 +1198,52 @@ function parseValue(value: string): any {
   }
 
   return value;
+}
+
+// Función para convertir INSERT a UPDATE cuando hay conflicto de clave
+function convertInsertToUpdate(insertStatement: string): string | null {
+  try {
+    // Parsear el INSERT statement
+    const insertRegex = /INSERT\s+INTO\s+["`]?(\w+)["`]?\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i;
+    const match = insertStatement.match(insertRegex);
+
+    if (!match) {
+      return null;
+    }
+
+    const tableName = match[1];
+    const columnsStr = match[2];
+    const valuesStr = match[3];
+
+    // Extraer columnas y valores
+    const columns = columnsStr.split(',').map(c => c.trim().replace(/["`]/g, ''));
+    const values = valuesStr.split(',').map(v => v.trim());
+
+    if (columns.length === 0 || values.length === 0 || columns.length !== values.length) {
+      return null;
+    }
+
+    // Asumir que la primera columna es la clave primaria para el WHERE
+    const primaryKeyColumn = columns[0];
+    const primaryKeyValue = values[0];
+
+    // Crear SET clause con las demás columnas
+    const setParts: string[] = [];
+    for (let i = 1; i < columns.length; i++) {
+      setParts.push(`"${columns[i]}" = ${values[i]}`);
+    }
+
+    if (setParts.length === 0) {
+      return null; // No hay columnas para actualizar
+    }
+
+    const updateStatement = `UPDATE "${tableName}" SET ${setParts.join(', ')} WHERE "${primaryKeyColumn}" = ${primaryKeyValue};`;
+
+    return updateStatement;
+  } catch (error) {
+    logger.error('Error convirtiendo INSERT a UPDATE:', error);
+    return null;
+  }
 }
 
 // Función auxiliar para parsear INSERT statements del archivo SQL

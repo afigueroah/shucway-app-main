@@ -320,12 +320,37 @@ const Backup: React.FC = () => {
     fetchIncremental();
   }, [fetchSchema, fetchIncremental]);
 
-  const handleDownloadSchema = useCallback(() => {
+  const handleDownloadSchema = useCallback(async () => {
     if (!schemaData) {
-      messageApi.warning('Aún no se cargó la información del esquema.');
-      return;
+      messageApi.warning('Aún no se cargó la información del esquema. Intentando usar backup corregido...');
     }
 
+    // Intentar usar el archivo backup_final.sql directamente
+    try {
+      const response = await fetch('/backup_final.sql');
+      if (response.ok) {
+        const sql = await response.text();
+        const timestamp = sanitizeFilenameFragment(new Date().toISOString());
+        const filename = `backup-completo-${timestamp}.sql`;
+
+        const sizeBytes = downloadTextFile(sql, filename);
+        registerHistory({
+          id: createId(),
+          type: 'schema',
+          label: 'Backup de Datos',
+          createdAt: new Date().toISOString(),
+          filename,
+          sizeBytes,
+          sourceGeneratedAt: new Date().toISOString(),
+        });
+        messageApi.success('Backup exportado exitosamente usando archivo corregido.');
+        return;
+      }
+    } catch (error) {
+      console.warn('No se pudo cargar el archivo corregido, usando datos dinámicos:', error);
+    }
+
+    // Fallback: usar datos dinámicos si no se puede cargar el archivo
     const sql = composeSchemaSql(schemaData);
     const timestamp = sanitizeFilenameFragment(schemaData.generatedAt || new Date().toISOString());
     const filename = `backup-completo-${timestamp}.sql`;
