@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import dbSchema, { TableMeta } from './dbSchema';
 import api from '@/api/apiClient';
 import { localStore } from '@/utils/storage';
-import { FaEye, FaEdit, FaTrash, FaPlus, FaFilter, FaColumns, FaUndo, FaSearch, FaChevronRight, FaDatabase } from 'react-icons/fa';
-import { Button, Spin, Table, message, Modal, Input, Select, Form, Drawer, Switch, Dropdown, Tag, Alert, Empty, Upload } from 'antd';
-import { RollbackOutlined, UploadOutlined } from '@ant-design/icons';
+import { FaEye, FaEdit, FaTrash, FaPlus, FaFilter, FaUndo, FaSearch, FaChevronRight, FaDatabase } from 'react-icons/fa';
+import { Button, Spin, Table, message, Modal, Input, Select, Form, Drawer, Switch, Tag, Alert, Empty, Upload } from 'antd';
+import { RollbackOutlined, UploadOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { ColumnsType } from 'antd/es/table';
+
+const { Dragger } = Upload;
 
 interface TableRecord {
   [key: string]: string | number | boolean | null | undefined;
@@ -36,8 +38,38 @@ const TABLE_GROUPS: Record<string, string[]> = {
 const SCHEMA_TABLE_MAP = dbSchema.tables as Record<string, TableMeta>;
 const SCHEMA_TABLE_KEYS = Object.keys(SCHEMA_TABLE_MAP);
 
+const formatBytes = (bytes?: number) => {
+  if (!bytes || Number.isNaN(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  const display = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
+  return `${display} ${units[unitIndex]}`;
+};
+
+const formatFileDate = (timestamp?: number) => {
+  if (!timestamp) return 'Fecha desconocida';
+  try {
+    return new Intl.DateTimeFormat('es-PE', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(timestamp));
+  } catch {
+    return new Date(timestamp).toLocaleString();
+  }
+};
+
 const Mantenimiento: React.FC = () => {
   const navigate = useNavigate();
+
+  const apiBaseUrl = useMemo(
+    () => ((import.meta.env.VITE_API_URL as string | undefined) || '/api').replace(/\/$/, ''),
+    []
+  );
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [tables, setTables] = useState<string[]>([]);
   const [data, setData] = useState<TableRecord[]>([]);
@@ -45,7 +77,7 @@ const Mantenimiento: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(false);
-  const [showDeleted, setShowDeleted] = useState<boolean>(false);
+  const [showDeleted] = useState<boolean>(false);
   const [estadoField, setEstadoField] = useState<string | null>(null);
   const [activoField, setActivoField] = useState<string | null>(null);
 
@@ -66,26 +98,107 @@ const Mantenimiento: React.FC = () => {
   const [restoring, setRestoring] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
+  const closeRestoreModal = useCallback(() => {
+    setRestoreModalVisible(false);
+    setRestoreFile(null);
+    setLastError(null);
+  }, []);
+
+  const handleRestoreFileSelect = useCallback((file: File) => {
+    setRestoreFile(file);
+    setLastError(null);
+    return false;
+  }, []);
+
+  const handleClearRestoreFile = useCallback(() => {
+    setRestoreFile(null);
+    setLastError(null);
+  }, []);
+
   const handleRestoreBackup = async () => {
-    if (!restoreFile) {
-      message.error('Selecciona un archivo de backup');
-      return;
+    let fileToUse = restoreFile;
+
+    // Si no hay archivo seleccionado, usar el archivo backup_final.sql automáticamente
+    if (!fileToUse) {
+      try {
+        message.info('Usando archivo de backup corregido automáticamente...');
+        const response = await fetch('/backup_final.sql');
+        if (!response.ok) {
+          throw new Error('No se pudo cargar el archivo de backup corregido');
+        }
+        const blob = await response.blob();
+        fileToUse = new File([blob], 'backup_final.sql', { type: 'application/sql' });
+      } catch (error) {
+        message.error('Error al cargar el archivo de backup corregido');
+        return;
+      }
     }
 
     setRestoring(true);
     try {
-      const text = await restoreFile.text();
-      await api.post('/maintenance/execute-sql', { sql: text });
-      message.success('Backup restaurado exitosamente');
-      setRestoreModalVisible(false);
-      setRestoreFile(null);
-      // Recargar datos si hay tabla seleccionada
-      if (selectedTable) {
-        await loadTableData(selectedTable);
+      const formData = new FormData();
+      formData.append('backupFile', fileToUse);
+
+      const response = await fetch(`${apiBaseUrl}/backup/restore`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStore.get('access_token')}`,
+        },
+        body: formData,
+      });
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('Error al parsear respuesta del servidor:', parseError);
+        throw new Error('El servidor no devolvió una respuesta válida');
+      }
+
+      if (!result) {
+        throw new Error('El servidor no devolvió ninguna respuesta');
+      }
+
+      if (response.ok && result.success) {
+        // Determinar el mensaje según el tipo de restauración
+        let successMessage = 'Backup restaurado exitosamente';
+        
+        if (result.type === 'sql_code') {
+          successMessage = 'Código SQL ejecutado correctamente';
+        } else if (result.results) {
+          const successRows = result.results.success ?? 0;
+          const totalRows = result.results.total ?? successRows;
+          const errorRows = result.results.errors ?? 0;
+          successMessage = `Backup restaurado: ${successRows}/${totalRows} inserts correctos${errorRows ? `, ${errorRows} con error` : ''}.`;
+        }
+        
+        message.success(successMessage);
+        closeRestoreModal();
+        // Recargar datos si hay tabla seleccionada
+        if (selectedTable) {
+          await fetchData();
+        }
+      } else {
+        // Mensaje de error personalizado si falta la función RPC
+        if (result.sqlNeeded) {
+          message.error({
+            content: (
+              <div>
+                <div>{result.error}</div>
+                <div style={{ marginTop: 8, fontSize: '12px', opacity: 0.8 }}>
+                  {result.details}
+                </div>
+              </div>
+            ),
+            duration: 10,
+          });
+          throw new Error(result.error);
+        }
+        throw new Error(result.error || result.message || 'Error desconocido al restaurar backup');
       }
     } catch (error) {
       console.error('Error al restaurar backup:', error);
-      message.error('Error al restaurar backup');
+      message.error(`Error al restaurar backup: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setRestoring(false);
     }
@@ -519,14 +632,14 @@ const Mantenimiento: React.FC = () => {
         localStore.remove('user');
         window.location.href = '/login';
       } else if (response.status === 403) {
-        const errorData = await response.json();
+        const errorData = response.data;
         const errorMessage = errorData.message || 'No tienes permisos para acceder a esta tabla';
         message.error(errorMessage);
         setLastError(errorMessage);
         setColumns([]);
         setData([]);
       } else {
-        const errorDetails = await response.text();
+        const errorDetails = response.data;
         const errorMessage = errorDetails || `Error al obtener los datos (HTTP ${response.status})`;
         console.error('Error fetching data:', errorMessage);
         message.error(errorMessage);
@@ -768,12 +881,6 @@ const Mantenimiento: React.FC = () => {
   const handleFilterChange = (column: string, value: string) => {
     setFilters(prev => ({ ...prev, [column]: value }));
     setTableCurrentPage(1);
-  };
-
-  const handleColumnToggle = (key: string) => {
-    setColumns(prev => prev.map(col =>
-      col.key === key ? { ...col, hidden: !col.hidden } : col
-    ));
   };
 
   const getPriorityColumns = useCallback((cols: TableColumn[]): TableColumn[] => {
@@ -1342,28 +1449,102 @@ const Mantenimiento: React.FC = () => {
           </Form>
         </Drawer>
 
-        <Modal
-          title="Restaurar Backup"
-          open={restoreModalVisible}
-          onOk={handleRestoreBackup}
-          onCancel={() => setRestoreModalVisible(false)}
-          confirmLoading={restoring}
-          okText="Restaurar"
-          cancelText="Cancelar"
-        >
-          <p>Selecciona un archivo SQL de backup para restaurar la base de datos.</p>
-          <Upload
-            beforeUpload={(file) => {
-              setRestoreFile(file);
-              return false;
-            }}
-            maxCount={1}
-            accept=".sql"
-          >
-            <Button icon={<UploadOutlined />}>Seleccionar archivo SQL</Button>
-          </Upload>
-          {restoreFile && <p>Archivo seleccionado: {restoreFile.name}</p>}
-        </Modal>
+        {/* Modal: confirmar restauración de backup */}
+        {restoreModalVisible && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={!restoring ? closeRestoreModal : undefined} />
+            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                  <DatabaseOutlined className="text-2xl text-green-700" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Restaurar Backup
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {restoreFile ? (
+                    <>
+                      ¿Estás seguro de que quieres restaurar el backup <strong>"{restoreFile.name}"</strong>?
+                      <br />
+                      <span className="text-sm text-green-600 font-medium">
+                        Esto insertará datos directamente en la base de datos.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-green-600 font-semibold">Opción automática disponible:</span> Si no seleccionas un archivo, el sistema usará automáticamente el backup corregido con dependencias resueltas.
+                      <br />
+                      <span className="text-sm text-gray-500">
+                        También puedes seleccionar manualmente un archivo .sql personalizado.
+                      </span>
+                    </>
+                  )}
+                </p>
+
+                {!restoreFile && (
+                  <div className="mb-6">
+                    <Dragger
+                      name="backup"
+                      multiple={false}
+                      accept=".sql"
+                      showUploadList={false}
+                      disabled={restoring}
+                      beforeUpload={(file) => handleRestoreFileSelect(file as File)}
+                      onDrop={(event) => {
+                        const droppedFile = event.dataTransfer?.files?.[0];
+                        if (droppedFile) {
+                          handleRestoreFileSelect(droppedFile as File);
+                        }
+                      }}
+                      className="rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50 py-4 min-h-[120px]"
+                    >
+                      <p className="ant-upload-drag-icon text-emerald-500 text-2xl">
+                        <UploadOutlined />
+                      </p>
+                      <p className="ant-upload-text text-sm font-semibold text-slate-900">
+                        Arrastra aquí tu archivo .sql o haz clic para adjuntarlo
+                      </p>
+                      <p className="ant-upload-hint text-xs text-slate-500">
+                        Archivos SQL válidos · incluye archivos corregidos manualmente · envío seguro
+                      </p>
+                    </Dragger>
+                  </div>
+                )}
+
+                {restoreFile && (
+                  <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                    <p className="m-0 text-sm font-semibold text-emerald-900">{restoreFile.name}</p>
+                    <p className="m-0 text-xs uppercase tracking-wide text-emerald-700">
+                      {formatBytes(restoreFile.size)} · {formatFileDate(restoreFile.lastModified)}
+                    </p>
+                    <Button type="link" size="small" className="px-0 mt-2" onClick={handleClearRestoreFile} disabled={restoring}>
+                      Cambiar archivo
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={closeRestoreModal}
+                    disabled={restoring}
+                    className="flex-1 h-11 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRestoreBackup}
+                    disabled={restoring}
+                    className="flex-1 h-11 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {restoring ? 'Restaurando…' : (restoreFile ? 'Restaurar ahora' : 'Usar backup corregido')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

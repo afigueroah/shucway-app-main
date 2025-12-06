@@ -23,3 +23,20 @@ dist-electron
 *.njsproj
 *.sln
 *.sw?
+
+# Backup files and temporary scripts
+*.sql
+!frontend/public/backup_final.sql
+fix_*.js
+add_*.js
+remove_*.js
+diagnose_*.js
+backup-*.sql
+backs_*.sql
+database_*.sql
+temp_*.sql
+check_*.js
+create_*.sql
+diagnostico_*.ps1
+main.js
+main.mjs

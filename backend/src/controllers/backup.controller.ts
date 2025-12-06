@@ -434,7 +434,7 @@ export const getIncrementalBackup = async (req: Request, res: Response) => {
 const generateAllDataInserts = async (): Promise<string[]> => {
   const inserts: string[] = [];
 
-  // Lista de todas las tablas importantes en orden de dependencia
+  // Lista de tablas en el orden de dependencias para evitar errores de clave foránea
   const tables = [
     'rol_usuario',
     'perfil_usuario',
@@ -451,10 +451,11 @@ const generateAllDataInserts = async (): Promise<string[]> => {
     'cliente',
     'categoria_gasto',
     'gasto_operativo',
+    'caja_sesion',
     'arqueo_caja',
-    'deposito_banco',
     'venta',
     'detalle_venta',
+    'deposito_banco',
     'orden_compra',
     'detalle_orden_compra',
     'recepcion_mercaderia',
@@ -467,8 +468,7 @@ const generateAllDataInserts = async (): Promise<string[]> => {
     'bitacora_productos',
     'auditoria_inventario',
     'auditoria_detalle',
-    'bitacora_auditoria',
-    'caja_sesion'
+    'bitacora_auditoria'
   ];
 
   for (const tableName of tables) {
@@ -516,26 +516,48 @@ const generateInsertStatements = (tableName: string, data: any[]): string[] => {
   if (!data || data.length === 0) return [];
 
   const statements: string[] = [];
-  const columns = Object.keys(data[0]).filter(col => col !== 'created_at' && col !== 'updated_at');
 
-  // Procesar en lotes de 100 registros para evitar statements demasiado largos
-  const batchSize = 100;
-  for (let i = 0; i < data.length; i += batchSize) {
-    const batch = data.slice(i, i + batchSize);
-    const values = batch.map(row => {
-      const rowValues = columns.map(col => {
-        const value = row[col];
-        if (value === null || value === undefined) return 'NULL';
-        if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
-        if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
-        if (value instanceof Date) return `'${value.toISOString()}'`;
-        if (typeof value === 'object') return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
-        return value.toString();
-      });
-      return `(${rowValues.join(', ')})`;
+  // Columnas que no se pueden insertar (GENERATED, DEFAULT, etc.)
+  const excludedColumns: Record<string, string[]> = {
+    'arqueo_caja': ['total_billetes_100', 'total_billetes_50', 'total_billetes_20', 'total_billetes_10', 'total_billetes_5', 'total_monedas_1', 'total_monedas_050', 'total_monedas_025', 'total_contado', 'diferencia'],
+    'auditoria_detalle': ['diferencia'],
+    'detalle_orden_compra': ['subtotal', 'iva'],
+    'gasto_operativo': ['numero_gasto'],
+    'venta': ['total_venta', 'total_costo'],
+    'cliente': ['puntos_acumulados'],
+    'insumo': ['costo_promedio', 'stock_actual'],
+    'producto': ['costo_calculado'],
+    'lote_insumo': ['cantidad_actual'],
+    'movimiento_inventario': ['costo_unitario_momento'],
+    'orden_compra': ['total'],
+    'recepcion_mercaderia': ['total_recibido'],
+    'detalle_recepcion_mercaderia': ['cantidad_aceptada'],
+    'detalle_venta': ['subtotal', 'costo_total', 'precio_unitario', 'costo_unitario'],
+    'historial_puntos': ['puntos_nuevo']
+  };
+
+  const columns = Object.keys(data[0])
+    .filter(col => col !== 'created_at' && col !== 'updated_at')
+    .filter(col => !excludedColumns[tableName]?.includes(col));
+
+  if (columns.length === 0) {
+    logger.warn(`No hay columnas válidas para insertar en la tabla ${tableName}`);
+    return [];
+  }
+
+  // Crear INSERT statements individuales para mejor manejo de errores
+  for (const row of data) {
+    const rowValues = columns.map(col => {
+      const value = row[col];
+      if (value === null || value === undefined) return 'NULL';
+      if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+      if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+      if (value instanceof Date) return `'${value.toISOString()}'`;
+      if (typeof value === 'object') return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+      return value.toString();
     });
 
-    const insertStatement = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${values.join(', ')};`;
+    const insertStatement = `INSERT INTO ${tableName} (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${rowValues.join(', ')}) ON CONFLICT DO NOTHING;`;
     statements.push(insertStatement);
   }
 
@@ -767,3 +789,424 @@ export const getIncrementalSqlDump = async (_req: Request, res: Response) => {
     });
   }
 };
+
+// Función para restaurar backup desde archivo SQL
+export const restoreBackup = async (req: Request, res: Response) => {
+  try {
+    // Verificar que se haya subido un archivo
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se ha proporcionado ningún archivo',
+      });
+    }
+
+    const fileContent = req.file.buffer.toString('utf-8');
+    logger.info(`Iniciando restauración de backup. Tamaño del archivo: ${fileContent.length} caracteres`);
+
+    // Parsear el archivo SQL para extraer INSERT statements
+    const insertStatements = parseInsertStatements(fileContent);
+
+    if (insertStatements.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se encontraron statements INSERT válidos en el archivo',
+      });
+    }
+
+    // Validar que los INSERT statements contengan datos reales, no código SQL con variables
+    const invalidStatements = insertStatements.filter(stmt =>
+      stmt.includes('v_') || stmt.includes('p_') || stmt.includes('NEW.') || stmt.includes('OLD.')
+    );
+
+    // Forzar el uso de execute_sql directo para archivos de backup procesados
+    if (true || invalidStatements.length > 0) {
+      // Usar el método directo de SQL que funciona desde el SQL Editor
+      logger.info('Usando método directo de SQL para restauración de backup...');
+
+      try {
+        // Limpiar comentarios del SQL
+        const cleanedSQL = fileContent
+          .replace(/--.*$/gm, '') // Comentarios de línea
+          .replace(/\/\*[\s\S]*?\*\//g, '') // Comentarios de bloque
+          .trim();
+
+        if (!cleanedSQL) {
+          return res.status(400).json({
+            success: false,
+            error: 'El archivo no contiene SQL válido después de limpiar comentarios'
+          });
+        }
+
+        // Ejecutar el SQL usando RPC
+        const { data, error } = await supabase.rpc('execute_sql', {
+          sql_query: cleanedSQL
+        });
+
+        if (error) {
+          logger.error('Error al ejecutar SQL directamente:', error);
+
+          // Verificar si la función no existe
+          if (error.message?.includes('function') && error.message?.includes('does not exist')) {
+            return res.status(500).json({
+              success: false,
+              error: 'La función execute_sql no está configurada en Supabase',
+              details: 'Por favor, ejecuta el script SQL para crear la función execute_sql en el SQL Editor de Supabase.',
+              sqlNeeded: true
+            });
+          }
+
+          return res.status(500).json({
+            success: false,
+            error: 'Error al ejecutar el código SQL',
+            details: error.message
+          });
+        }
+
+        const rpcResult = Array.isArray(data) ? data[0] : data;
+        const rpcSuccess = rpcResult?.success !== false;
+
+        if (!rpcSuccess) {
+          const rpcErrorMessage = rpcResult?.error || 'La función execute_sql reportó un error interno';
+          logger.error('execute_sql devolvió error lógico:', rpcErrorMessage);
+          return res.status(500).json({
+            success: false,
+            error: rpcErrorMessage,
+            details: rpcResult?.detail || 'Verifique el contenido del archivo SQL.'
+          });
+        }
+
+        logger.info('Código SQL ejecutado exitosamente');
+        return res.json({
+          success: true,
+          message: 'Backup restaurado exitosamente usando SQL directo',
+          type: 'sql_code',
+          results: {
+            total: insertStatements.length,
+            success: insertStatements.length,
+            errors: 0,
+            details: []
+          }
+        });
+
+      } catch (error) {
+        logger.error('Error ejecutando SQL directamente:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Error al ejecutar el código SQL',
+          details: error instanceof Error ? error.message : 'Error desconocido'
+        });
+      }
+    }
+
+    logger.info(`Encontrados ${insertStatements.length} statements INSERT válidos para ejecutar`);
+
+    // Ejecutar los INSERT statements
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < insertStatements.length; i++) {
+      const statement = insertStatements[i];
+      try {
+        const result = await executeInsertStatement(statement);
+
+        if (!result.success) {
+          logger.error(`Error ejecutando INSERT ${i + 1}:`, result.error);
+          results.push({
+            index: i + 1,
+            statement: statement.substring(0, 100) + '...',
+            success: false,
+            error: result.error,
+          });
+          errorCount++;
+        } else {
+          results.push({
+            index: i + 1,
+            statement: statement.substring(0, 100) + '...',
+            success: true,
+          });
+          successCount++;
+        }
+      } catch (error) {
+        logger.error(`Error ejecutando INSERT ${i + 1}:`, error);
+        results.push({
+          index: i + 1,
+          statement: statement.substring(0, 100) + '...',
+          success: false,
+          error: error instanceof Error ? error.message : 'Error desconocido',
+        });
+        errorCount++;
+      }
+    }
+
+    logger.info(`Restauración completada. Éxitos: ${successCount}, Errores: ${errorCount}`);
+
+    const payload = {
+      message: `Restauración completada. ${successCount} inserts exitosos, ${errorCount} errores.`,
+      results: {
+        total: insertStatements.length,
+        success: successCount,
+        errors: errorCount,
+        details: results,
+      },
+      partial: errorCount > 0,
+    };
+
+    if (successCount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ningún registro del backup pudo insertarse. Revisa el archivo e inténtalo nuevamente.',
+        ...payload,
+      });
+    }
+
+    return res.json({
+      success: errorCount === 0,
+      ...payload,
+    });
+
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error desconocido al restaurar backup';
+    logger.error('Error restaurando backup:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error al restaurar el backup',
+      details: message,
+    });
+  }
+};
+
+// Función para parsear y ejecutar INSERT statements usando operaciones CRUD normales
+async function executeInsertStatement(insertSql: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Remover cláusula ON CONFLICT si existe (para compatibilidad con UPSERT)
+    let cleanSql = insertSql.replace(/\s*ON\s+CONFLICT\s*\([^)]+\)\s*DO\s*NOTHING\s*;?$/i, '');
+
+    // Parsear el INSERT statement - ahora soporta múltiples VALUES
+    const insertRegex = /INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*(.+)/i;
+    const match = cleanSql.match(insertRegex);
+
+    if (!match) {
+      return { success: false, error: 'Formato de INSERT no válido' };
+    }
+
+    const tableName = match[1];
+    const columnsStr = match[2];
+    const valuesPart = match[3].replace(/;$/, ''); // Remover ; al final si existe
+
+    // Verificar si contiene variables (lo que indica que es código SQL, no datos)
+    if (valuesPart.includes('v_') || valuesPart.includes('p_') || valuesPart.includes('NEW.') || valuesPart.includes('OLD.')) {
+      return { success: false, error: 'Este INSERT statement contiene variables y no puede ser ejecutado como dato real' };
+    }
+
+    // Parsear columnas
+    const columns = columnsStr.split(',').map(col => col.trim().replace(/["`]/g, ''));
+
+    // Parsear múltiples VALUES separados por comas
+    const valueSets = parseMultipleValueSets(valuesPart);
+
+    if (valueSets.length === 0) {
+      return { success: false, error: 'No se encontraron valores para insertar' };
+    }
+
+    // Ejecutar cada conjunto de valores
+    for (const valueSet of valueSets) {
+      const values = parseInsertValues(valueSet);
+
+      if (columns.length !== values.length) {
+        return { success: false, error: `Número de columnas (${columns.length}) no coincide con número de valores (${values.length}) en el conjunto: ${valueSet}` };
+      }
+
+      // Crear objeto de datos para insertar
+      const data: Record<string, any> = {};
+      columns.forEach((col, index) => {
+        data[col] = values[index];
+      });
+
+      // Ejecutar inserción usando Supabase
+      const { error } = await supabase.from(tableName).insert(data);
+
+      if (error) {
+        // Si es un error de clave duplicada, lo consideramos exitoso (el registro ya existe)
+        if (error.code === '23505' || error.message?.includes('duplicate key value')) {
+          continue; // Continuar con el siguiente conjunto de valores
+        }
+        // Para otros errores, los reportamos
+        return { success: false, error: error.message };
+      }
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+// Función auxiliar para parsear valores de INSERT (simplificada)
+function parseInsertValues(valuesStr: string): any[] {
+  const values: any[] = [];
+  let current = '';
+  let inString = false;
+  let stringChar = '';
+  let parenDepth = 0;
+
+  for (let i = 0; i < valuesStr.length; i++) {
+    const char = valuesStr[i];
+
+    if (!inString && (char === '"' || char === "'")) {
+      inString = true;
+      stringChar = char;
+      current += char;
+    } else if (inString && char === stringChar && valuesStr[i - 1] !== '\\') {
+      inString = false;
+      current += char;
+    } else if (!inString && char === '(') {
+      parenDepth++;
+      current += char;
+    } else if (!inString && char === ')') {
+      parenDepth--;
+      current += char;
+    } else if (!inString && char === ',' && parenDepth === 0) {
+      values.push(parseValue(current.trim()));
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  if (current.trim()) {
+    values.push(parseValue(current.trim()));
+  }
+
+  return values;
+}
+
+// Función auxiliar para parsear múltiples conjuntos de VALUES
+function parseMultipleValueSets(valuesPart: string): string[] {
+  const valueSets: string[] = [];
+  let current = '';
+  let inString = false;
+  let stringChar = '';
+  let parenDepth = 0;
+  let braceDepth = 0;
+
+  for (let i = 0; i < valuesPart.length; i++) {
+    const char = valuesPart[i];
+
+    if (!inString && (char === '"' || char === "'")) {
+      inString = true;
+      stringChar = char;
+      current += char;
+    } else if (inString && char === stringChar && valuesPart[i - 1] !== '\\') {
+      inString = false;
+      current += char;
+    } else if (!inString && char === '(') {
+      parenDepth++;
+      current += char;
+    } else if (!inString && char === ')') {
+      parenDepth--;
+      current += char;
+      // Si cerramos el último paréntesis de un conjunto de valores
+      if (parenDepth === 0 && current.trim()) {
+        valueSets.push(current.trim());
+        current = '';
+        // Saltar la coma siguiente si existe
+        if (valuesPart[i + 1] === ',') {
+          i++; // Saltar la coma
+        }
+      }
+    } else {
+      current += char;
+    }
+  }
+
+  // Agregar el último conjunto si existe
+  if (current.trim()) {
+    valueSets.push(current.trim());
+  }
+
+  return valueSets;
+}
+
+// Función auxiliar para parsear un valor individual
+function parseValue(value: string): any {
+  if (value === 'NULL' || value === 'null') {
+    return null;
+  }
+
+  if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
+    return value.slice(1, -1).replace(/\\'/g, "'").replace(/\\"/g, '"');
+  }
+
+  if (value === 'TRUE' || value === 'true') {
+    return true;
+  }
+
+  if (value === 'FALSE' || value === 'false') {
+    return false;
+  }
+
+  // Intentar parsear como número
+  const num = Number(value);
+  if (!isNaN(num)) {
+    return num;
+  }
+
+  return value;
+}
+
+// Función auxiliar para parsear INSERT statements del archivo SQL
+function parseInsertStatements(sqlContent: string): string[] {
+  const statements: string[] = [];
+  let currentStatement = '';
+  let inString = false;
+  let stringChar = '';
+  let parenthesesDepth = 0;
+
+  for (let i = 0; i < sqlContent.length; i++) {
+    const char = sqlContent[i];
+    const nextChar = sqlContent[i + 1] || '';
+
+    // Manejar strings
+    if (!inString && (char === '"' || char === "'")) {
+      inString = true;
+      stringChar = char;
+    } else if (inString && char === stringChar && nextChar !== stringChar) {
+      // No es un string escapado
+      inString = false;
+      stringChar = '';
+    } else if (inString && char === stringChar && nextChar === stringChar) {
+      // String escapado, saltar el siguiente
+      i++;
+    }
+
+    // Contar paréntesis si no estamos en un string
+    if (!inString) {
+      if (char === '(') {
+        parenthesesDepth++;
+      } else if (char === ')') {
+        parenthesesDepth--;
+      }
+    }
+
+    currentStatement += char;
+
+    // Si encontramos un punto y coma y no estamos en un string ni dentro de paréntesis
+    if (char === ';' && !inString && parenthesesDepth === 0) {
+      const trimmed = currentStatement.trim();
+      if (trimmed.toUpperCase().startsWith('INSERT')) {
+        statements.push(trimmed);
+      }
+      currentStatement = '';
+    }
+  }
+
+  // Agregar el último statement si existe
+  const trimmed = currentStatement.trim();
+  if (trimmed && trimmed.toUpperCase().startsWith('INSERT')) {
+    statements.push(trimmed);
+  }
+
+  return statements;
+}
