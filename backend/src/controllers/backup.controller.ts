@@ -978,7 +978,7 @@ export const restoreBackup = async (req: Request, res: Response) => {
           index: i + 1,
           statement: statement.substring(0, 100) + '...',
           success: false,
-          error: error instanceof Error ? error.message : 'Error desconocido',
+          error: getErrorMessage(error),
         });
         errorCount++;
       }
@@ -1133,7 +1133,6 @@ function parseMultipleValueSets(valuesPart: string): string[] {
   let inString = false;
   let stringChar = '';
   let parenDepth = 0;
-  let braceDepth = 0;
 
   for (let i = 0; i < valuesPart.length; i++) {
     const char = valuesPart[i];
@@ -1198,6 +1197,17 @@ function parseValue(value: string): any {
   }
 
   return value;
+}
+
+// Función auxiliar para obtener mensaje de error de manera segura
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return 'Error desconocido';
 }
 
 // Función para convertir INSERT a UPDATE cuando hay conflicto de clave

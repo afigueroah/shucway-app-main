@@ -91,15 +91,29 @@ export const updateProveedor = async (req: Request, res: Response) => {
 export const deleteProveedor = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-
-    const { error } = await supabase
+    // Eliminación lógica: marcar proveedor como inactivo en lugar de borrar la fila
+    const { data, error } = await supabase
       .from('proveedor')
-      .delete()
-      .eq('id_proveedor', id);
+      .update({ estado: false })
+      .eq('id_proveedor', id)
+      .select()
+      .single();
 
     if (error) {
-      console.error('Error al eliminar proveedor:', error);
+      console.error('Error al eliminar (desactivar) proveedor:', error);
+
+      // Si viene de una restricción de llave foránea, devolvemos un mensaje más claro
+      if ((error as any).code === '23503') {
+        return res.status(409).json({
+          message: 'No se puede eliminar el proveedor porque tiene insumos o presentaciones asociadas.',
+        });
+      }
+
       return res.status(500).json({ message: 'Error interno del servidor' });
+    }
+
+    if (!data) {
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
     return res.json({ message: 'Proveedor eliminado correctamente' });

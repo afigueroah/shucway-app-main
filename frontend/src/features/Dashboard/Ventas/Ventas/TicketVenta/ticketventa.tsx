@@ -101,7 +101,16 @@ const TicketVenta: React.FC = () => {
     if (!data?.fechaHora) return "—";
     try {
       const d = new Date(data.fechaHora);
-      return d.toLocaleString('es-ES', { timeZone: 'UTC' });
+      // Mostrar en hora local (ej. Guatemala), no en UTC
+      return d.toLocaleString('es-GT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
     } catch {
       return "—";
     }

@@ -16,6 +16,137 @@ export class VentasService {
   // ================== VENTAS ==================
 
   /**
+   * Validar stock de insumos operativos antes de crear la venta.
+   * Replica la lógica principal de fn_descontar_inventario_venta pero solo en modo lectura
+   * para evitar crear ventas que luego fallen por stock insuficiente.
+   */
+  private async validarStockVentaOperativo(dto: CreateVentaDTO): Promise<void> {
+    if (!dto.detalles || dto.detalles.length === 0) return;
+
+    const round3 = (v: number): number => Math.round(v * 1000) / 1000;
+
+    const productoIds = Array.from(new Set(dto.detalles.map(d => d.id_producto).filter((id): id is number => typeof id === 'number')));
+
+    if (!productoIds.length) return;
+
+    type RecetaRow = {
+      id_producto: number;
+      id_variante: number | null;
+      id_insumo: number;
+      cantidad_requerida: number;
+      insumo?: {
+        id_insumo: number;
+        nombre_insumo: string;
+        categoria_insumo?: {
+          tipo_categoria: 'perpetuo' | 'operativo';
+        };
+      } | null;
+    };
+
+    const { data: recetas, error: recetasError } = await supabase
+      .from('receta_detalle')
+      .select(`
+        id_producto,
+        id_variante,
+        id_insumo,
+        cantidad_requerida,
+        insumo:insumo(
+          id_insumo,
+          nombre_insumo,
+          categoria_insumo:categoria_insumo(tipo_categoria)
+        )
+      `)
+      .in('id_producto', productoIds as number[]);
+
+    if (recetasError) {
+      console.error('Error al obtener recetas para validación de stock:', recetasError);
+      return; // No bloquear la venta por un error de lectura, los triggers aún validarán
+    }
+
+    const recetasList: RecetaRow[] = Array.isArray(recetas) ? (recetas as unknown as RecetaRow[]) : [];
+
+    // Acumular cantidad requerida por insumo
+    const requeridosPorInsumo = new Map<
+      number,
+      {
+        requerido: number;
+        nombre: string;
+      }
+    >();
+
+    for (const det of dto.detalles) {
+      if (typeof det.id_producto !== 'number' || typeof det.cantidad !== 'number') continue;
+
+      const recetasAplicables = recetasList.filter(r =>
+        r.id_producto === det.id_producto && (r.id_variante === null || r.id_variante === (det.id_variante ?? null))
+      );
+
+      if (!recetasAplicables.length) continue;
+
+      for (const r of recetasAplicables) {
+        const insumoInfo = r.insumo;
+        const tipoCategoria = insumoInfo?.categoria_insumo?.tipo_categoria;
+
+        // Solo validar insumos operativos, igual que la función PL/pgSQL
+        if (tipoCategoria !== 'operativo') continue;
+
+        const cantidadReceta = typeof r.cantidad_requerida === 'number' ? r.cantidad_requerida : Number(r.cantidad_requerida);
+        if (!cantidadReceta || Number.isNaN(cantidadReceta)) continue;
+
+        const cantidadVendida = det.cantidad;
+        const cantidadADescontar = round3(cantidadVendida * cantidadReceta);
+
+        const clave = r.id_insumo;
+        const nombre = insumoInfo?.nombre_insumo || `Insumo #${clave}`;
+        const anterior = requeridosPorInsumo.get(clave)?.requerido ?? 0;
+
+        requeridosPorInsumo.set(clave, {
+          requerido: round3(anterior + cantidadADescontar),
+          nombre,
+        });
+      }
+    }
+
+    if (!requeridosPorInsumo.size) return;
+
+    const insumoIds = Array.from(requeridosPorInsumo.keys());
+
+    // Obtener stock actual por insumo (suma de cantidades de todos los lotes)
+    const { data: lotes, error: lotesError } = await supabase
+      .from('lote_insumo')
+      .select('id_insumo, cantidad_actual')
+      .in('id_insumo', insumoIds as number[]);
+
+    if (lotesError) {
+      console.error('Error al obtener lotes para validación de stock:', lotesError);
+      return; // No bloquear la venta por un error de lectura, los triggers aún validarán
+    }
+
+    const stockPorInsumo = new Map<number, number>();
+
+    (lotes || []).forEach((lote: any) => {
+      const idInsumo = lote.id_insumo as number;
+      const cantidadActual = typeof lote.cantidad_actual === 'number' ? lote.cantidad_actual : Number(lote.cantidad_actual) || 0;
+      const anterior = stockPorInsumo.get(idInsumo) ?? 0;
+      stockPorInsumo.set(idInsumo, round3(anterior + cantidadActual));
+    });
+
+    // Validar cada insumo requerido
+    for (const [idInsumo, info] of requeridosPorInsumo.entries()) {
+      const disponible = stockPorInsumo.get(idInsumo) ?? 0;
+      if (disponible + 0.0001 < info.requerido) {
+        // Mismo formato de mensaje que la función de BD
+        const requeridoStr = info.requerido.toFixed(3);
+        const disponibleStr = disponible.toFixed(3);
+
+        throw new Error(
+          `Stock insuficiente para el insumo "${info.nombre}". Requerido: ${requeridoStr}, disponible: ${disponibleStr}`
+        );
+      }
+    }
+  }
+
+  /**
    * Obtener todas las ventas con filtros opcionales
    */
   async getVentas(
@@ -293,6 +424,10 @@ export class VentasService {
     if (dto.tipo_pago !== 'Canje' && dto.tipo_pago !== 'Cupon') {
       await cajaService.requireCajaAbierta(idCajero);
     }
+
+    // Validar stock de insumos operativos antes de crear la venta
+    // Así evitamos que la venta se guarde y falle más adelante (por ejemplo, al confirmar una transferencia)
+    await this.validarStockVentaOperativo(dto);
 
     // 1. Crear venta principal directamente en estado 'confirmada'
     const { data: venta, error: ventaError } = await supabase

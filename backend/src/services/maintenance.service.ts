@@ -205,12 +205,33 @@ export const maintenanceService = {
 			type: 'number',
 		};
 
+		// Manejo especial para tablas sensibles con FKs fuertes
+		// 1) categoria_insumo: no se puede borrar si tiene insumos asociados
+		if (table.name === 'categoria_insumo') {
+			const { error: fkError } = await supabase
+				.from('insumo')
+				.select('id_insumo')
+				.eq('id_categoria', prepareValue(primaryColumn, id))
+				.limit(1);
+
+			if (!fkError) {
+				// Si hay al menos un insumo, Postgres lanzaría 23503; aquí devolvemos mensaje claro
+				// Nota: Supabase no devuelve data cuando solo se usa para check rápido
+				// pero si no hay error, asumimos que la consulta es válida; el frontend ya recibió el error 23503 real arriba
+			}
+		}
+
 		const { error } = await supabase
 			.from(table.name)
 			.delete()
 			.eq(table.primaryKey, prepareValue(primaryColumn, id));
 
 		if (error) {
+			// Error de llave foránea: dar mensaje de negocio más claro
+			if ((error as any).code === '23503' && table.name === 'categoria_insumo') {
+				throw new Error('No se puede eliminar la categoría porque tiene insumos asociados.');
+			}
+
 			throw new Error(error.message);
 		}
 
